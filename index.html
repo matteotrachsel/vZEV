@@ -832,61 +832,28 @@ footer strong { color: rgba(255,255,255,.7); font-weight: 700; }
     </div>
 
     <!-- Worked example -->
-    <div class="card-head" style="margin-bottom:1rem">Zahlenbeispiel (ein 15-Minuten-Intervall)</div>
+    <div style="display:flex;align-items:baseline;gap:.75rem;margin-bottom:1rem">
+      <div class="card-head" style="margin:0" id="exampleTitle">Zahlenbeispiel (ein 15-Minuten-Intervall)</div>
+      <span id="examplePlaceholder" style="font-size:.75rem;color:var(--text-muted);font-weight:500">· wird nach dem Hochladen mit echten Daten befüllt</span>
+    </div>
     <div style="overflow-x:auto;margin-bottom:1.75rem">
-      <table style="min-width:560px">
+      <table id="exampleTable" style="min-width:560px">
         <thead>
           <tr>
             <th>Grösse</th>
-            <th class="tr">Zähler Ogimatte 10</th>
-            <th class="tr">Zähler Ogimatte 7</th>
+            <th class="tr">Zähler 1</th>
+            <th class="tr">Zähler 2</th>
             <th class="tr">Solar (Prod.)</th>
             <th class="tr">vZEV gesamt</th>
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td>Verbrauch C(t)</td>
-            <td class="tr">0.300 kWh</td>
-            <td class="tr">0.200 kWh</td>
-            <td class="tr">–</td>
-            <td class="tr"><strong>0.500 kWh</strong></td>
-          </tr>
-          <tr>
-            <td>Produktion P(t)</td>
-            <td class="tr">–</td>
-            <td class="tr">–</td>
-            <td class="tr tg">0.360 kWh</td>
-            <td class="tr">–</td>
-          </tr>
-          <tr>
-            <td>Selbstverbrauch SC(t) = min(0.360, 0.500)</td>
-            <td class="tr">–</td>
-            <td class="tr">–</td>
-            <td class="tr">–</td>
-            <td class="tr tg"><strong>0.360 kWh</strong></td>
-          </tr>
-          <tr>
-            <td>Netzeinspeisung FI(t) = max(0, 0.360−0.500)</td>
-            <td class="tr">–</td>
-            <td class="tr">–</td>
-            <td class="tr">–</td>
-            <td class="tr" style="color:var(--amber)"><strong>0.000 kWh</strong></td>
-          </tr>
-          <tr>
-            <td>Solar-Anteil V(t) = C / 0.500 × 0.360</td>
-            <td class="tr tg">0.300/0.500 × 0.360 = <strong>0.216 kWh</strong></td>
-            <td class="tr tg">0.200/0.500 × 0.360 = <strong>0.144 kWh</strong></td>
-            <td class="tr">–</td>
-            <td class="tr tg"><strong>0.360 kWh</strong></td>
-          </tr>
-          <tr>
-            <td>Netzbezug G(t) = C − V</td>
-            <td class="tr">0.300 − 0.216 = <strong>0.084 kWh</strong></td>
-            <td class="tr">0.200 − 0.144 = <strong>0.056 kWh</strong></td>
-            <td class="tr">–</td>
-            <td class="tr"><strong>0.140 kWh</strong></td>
-          </tr>
+          <tr><td>Verbrauch C(t)</td><td class="tr">0.300 kWh</td><td class="tr">0.200 kWh</td><td class="tr">–</td><td class="tr"><strong>0.500 kWh</strong></td></tr>
+          <tr><td>Produktion P(t)</td><td class="tr">–</td><td class="tr">–</td><td class="tr tg">0.360 kWh</td><td class="tr">–</td></tr>
+          <tr><td>Selbstverbrauch SC(t) = min(0.360, 0.500)</td><td class="tr">–</td><td class="tr">–</td><td class="tr">–</td><td class="tr tg"><strong>0.360 kWh</strong></td></tr>
+          <tr><td>Netzeinspeisung FI(t) = max(0, 0.360−0.500)</td><td class="tr">–</td><td class="tr">–</td><td class="tr">–</td><td class="tr" style="color:var(--amber)"><strong>0.000 kWh</strong></td></tr>
+          <tr><td>Solar-Anteil V(t) = C / 0.500 × 0.360</td><td class="tr tg">0.300/0.500 × 0.360 = <strong>0.216 kWh</strong></td><td class="tr tg">0.200/0.500 × 0.360 = <strong>0.144 kWh</strong></td><td class="tr">–</td><td class="tr tg"><strong>0.360 kWh</strong></td></tr>
+          <tr><td>Netzbezug G(t) = C − V</td><td class="tr">0.300 − 0.216 = <strong>0.084 kWh</strong></td><td class="tr">0.200 − 0.144 = <strong>0.056 kWh</strong></td><td class="tr">–</td><td class="tr"><strong>0.140 kWh</strong></td></tr>
         </tbody>
       </table>
     </div>
@@ -1244,6 +1211,7 @@ function calculateAndRender() {
   renderMeterAgg(agg, meters);
   renderCosts(agg, meters, tariff);
   renderCharts(monthly);
+  renderMethodologyExample(byTS, consMeters, prodMeters);
   document.getElementById('results').classList.remove('hidden');
   setStep(3);
   document.getElementById('results').scrollIntoView({ behavior:'smooth', block:'start' });
@@ -1376,6 +1344,56 @@ function renderCharts(monthly) {
     options:{ responsive:true, cutout:'62%',
       plugins:{ legend:{ position:'bottom', labels:{ font:{size:11,weight:'600'}, boxWidth:10, boxHeight:10 } } } }
   });
+}
+
+// ── METHODOLOGY EXAMPLE ─────────────────────────────────────────────────────
+function renderMethodologyExample(byTS, consMeters, prodMeters) {
+  // Pick the interval with the highest self-consumption where all meters have data
+  let bestTS = null, bestSC = -1;
+  Object.entries(byTS).forEach(([ts, slots]) => {
+    const prod = prodMeters.reduce((s,m) => { const sl=slots[m.messpunktNr]; return s+(sl?Math.max(sl.bezug,sl.einspeisung):0); }, 0);
+    const totalC = consMeters.reduce((s,m) => s+(slots[m.messpunktNr]?.bezug||0), 0);
+    const sc = Math.min(prod, totalC);
+    const allHaveData = consMeters.every(m => (slots[m.messpunktNr]?.bezug||0) > 0);
+    if (sc > bestSC && allHaveData) { bestSC = sc; bestTS = ts; }
+  });
+  if (!bestTS) return;
+
+  const slots = byTS[bestTS];
+  const d = new Date(parseInt(bestTS));
+  const prod = prodMeters.reduce((s,m) => { const sl=slots[m.messpunktNr]; return s+(sl?Math.max(sl.bezug,sl.einspeisung):0); }, 0);
+  const cons = consMeters.map(m => ({ m, c: slots[m.messpunktNr]?.bezug||0 }));
+  const totalC = cons.reduce((s,x) => s+x.c, 0);
+  const sc = Math.min(prod, totalC);
+  const fi = Math.max(0, prod-totalC);
+  const shares = cons.map(({m,c}) => ({ m, c, v: totalC>0 ? (c/totalC)*sc : 0 }));
+  const prodLabel = prodMeters.map(m => m.label||'Solar').join(' + ');
+
+  const thead = `<tr>
+    <th>Grösse</th>
+    ${shares.map(({m}) => `<th class="tr">${m.label||m.messpunktNr.slice(-8)}</th>`).join('')}
+    <th class="tr">${prodLabel}</th>
+    <th class="tr">vZEV gesamt</th>
+  </tr>`;
+
+  const p3=v=>v.toFixed(3), p=v=>`${p3(v)} kWh`;
+  const tbody = [
+    `<tr><td>Verbrauch C(t)</td>${shares.map(({c})=>`<td class="tr">${p(c)}</td>`).join('')}<td class="tr">–</td><td class="tr"><strong>${p(totalC)}</strong></td></tr>`,
+    `<tr><td>Produktion P(t)</td>${shares.map(()=>`<td class="tr">–</td>`).join('')}<td class="tr tg">${p(prod)}</td><td class="tr">–</td></tr>`,
+    `<tr><td>Selbstverbrauch SC(t) = min(${p3(prod)}, ${p3(totalC)})</td>${shares.map(()=>`<td class="tr">–</td>`).join('')}<td class="tr">–</td><td class="tr tg"><strong>${p(sc)}</strong></td></tr>`,
+    `<tr><td>Netzeinspeisung FI(t) = max(0, ${p3(prod)}−${p3(totalC)})</td>${shares.map(()=>`<td class="tr">–</td>`).join('')}<td class="tr">–</td><td class="tr" style="color:var(--amber)"><strong>${p(fi)}</strong></td></tr>`,
+    `<tr><td>Solar-Anteil V(t) = C&nbsp;/&nbsp;${p3(totalC)}&nbsp;×&nbsp;${p3(sc)}</td>${shares.map(({c,v})=>`<td class="tr tg">${p3(c)}/${p3(totalC)} × ${p3(sc)} = <strong>${p(v)}</strong></td>`).join('')}<td class="tr">–</td><td class="tr tg"><strong>${p(sc)}</strong></td></tr>`,
+    `<tr><td>Netzbezug G(t) = C − V</td>${shares.map(({c,v})=>`<td class="tr">${p3(c)} − ${p3(v)} = <strong>${p(c-v)}</strong></td>`).join('')}<td class="tr">–</td><td class="tr"><strong>${p(totalC-sc)}</strong></td></tr>`
+  ].join('');
+
+  const table = document.getElementById('exampleTable');
+  table.querySelector('thead').innerHTML = thead;
+  table.querySelector('tbody').innerHTML = tbody;
+
+  document.getElementById('exampleTitle').textContent =
+    `Zahlenbeispiel – ${d.toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit',year:'numeric'})} ${d.toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'})} Uhr`;
+  const ph = document.getElementById('examplePlaceholder');
+  if (ph) ph.textContent = '· Intervall mit höchstem Eigenverbrauch aus den hochgeladenen Daten';
 }
 
 // ── EXPORT ───────────────────────────────────────────────────────────────────
