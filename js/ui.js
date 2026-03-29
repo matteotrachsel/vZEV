@@ -218,9 +218,19 @@ async function fetchLatestTariff() {
   btn.textContent = 'Laden…';
   statusEl.innerHTML = '';
 
+  // BKW blocks direct browser fetches (CORS). Try two public CORS proxies in sequence.
+  const TARGET = 'https://www.bkw.ch/de/tarife-json';
+  const PROXIES = [
+    `https://corsproxy.io/?${encodeURIComponent(TARGET)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(TARGET)}`
+  ];
+
   try {
-    const res = await fetch('https://www.bkw.ch/de/tarife-json');
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    let res = null;
+    for (const proxy of PROXIES) {
+      try { res = await fetch(proxy); if (res.ok) break; } catch (_) { /* try next */ }
+    }
+    if (!res || !res.ok) throw new Error(`HTTP ${res?.status ?? 'unreachable'}`);
     const data = await res.json();
 
     // Walk the JSON tree to find numeric tariff values.
