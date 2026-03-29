@@ -106,9 +106,14 @@ function calculateAndRender() {
   const scRate = tot.prod > 0 ? (tot.sc   / tot.prod) * 100 : 0;
   const ssRate = tot.cons > 0 ? (tot.vzev / tot.cons) * 100 : 0;
 
-  const dates = AppState.parsedData.map(r => r.datum.getTime());
+  const dates       = AppState.parsedData.map(r => r.datum.getTime());
+  const periodStart = new Date(Math.min(...dates));
+  const periodEnd   = new Date(Math.max(...dates));
   document.getElementById('periodInfo').textContent =
-    `${fmt(new Date(Math.min(...dates)))} – ${fmt(new Date(Math.max(...dates)))}`;
+    `${fmt(periodStart)} – ${fmt(periodEnd)}`;
+
+  // Persist result so invoice generator can access it without recalculating.
+  AppState.lastResult = { agg, monthly, tot, scRate, ssRate, meters, tariff, distStats, periodStart, periodEnd };
 
   // ── Render all sections ───────────────────────────────────────────────────
   renderSummary(tot, scRate, ssRate);

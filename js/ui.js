@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function setupStaticHandlers() {
   document.getElementById('calculateBtn').addEventListener('click', calculateAndRender);
   document.getElementById('exportBtn').addEventListener('click', exportCSV);
+  document.getElementById('pdfBtn').addEventListener('click', exportPDF);
   document.getElementById('fetchTariffBtn').addEventListener('click', fetchLatestTariff);
 }
 

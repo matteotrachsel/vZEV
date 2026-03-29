@@ -8,5 +8,6 @@ const AppState = {
     monthly: null,   // Chart.js instance – monthly bar chart
     pie:     null,   // Chart.js instance – energy distribution pie
     dist:    null    // Chart.js instance – monthly vZEV share stacked bar
-  }
+  },
+  lastResult: null   // last computed vZEV result – used by invoice generator
 };
