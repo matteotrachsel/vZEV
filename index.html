@@ -742,7 +742,15 @@ footer strong { color: rgba(255,255,255,.7); font-weight: 700; }
       <div class="tfield">
         <label>Grundpreis</label>
         <input type="number" id="basePrice" value="3.25" step="0.01" min="0">
-        <div class="suffix">CHF/Monat pro Verbrauchszähler</div>
+        <div class="suffix">CHF/Monat</div>
+        <div style="margin-top:.55rem;display:flex;gap:.5rem;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:.35rem;font-size:.73rem;font-weight:600;color:var(--text-mid);cursor:pointer">
+            <input type="radio" name="splitBase" id="splitBase_each" value="each" checked style="accent-color:var(--primary)"> Pro Zähler
+          </label>
+          <label style="display:flex;align-items:center;gap:.35rem;font-size:.73rem;font-weight:600;color:var(--text-mid);cursor:pointer">
+            <input type="radio" name="splitBase" id="splitBase_prop" value="prop" style="accent-color:var(--primary)"> Geteilt (proportional zum Verbrauch)
+          </label>
+        </div>
       </div>
       <div class="tfield">
         <label>Netznutzung Arbeit</label>
@@ -1207,7 +1215,8 @@ function getTariff() {
   const np=parseFloat(document.getElementById('networkPrice').value)/100;
   const lp=parseFloat(document.getElementById('levyPrice').value)/100;
   const fp=parseFloat(document.getElementById('feedInPrice').value)/100;
-  return { ep,bp,np,lp,fp, work:ep+np+lp };
+  const splitBase = document.getElementById('splitBase_prop')?.checked || false;
+  return { ep,bp,np,lp,fp, work:ep+np+lp, splitBase };
 }
 
 function calculateAndRender() {
@@ -1403,10 +1412,22 @@ function renderCosts(agg, meters, tariff) {
     <th class="tr">KEV (${(tariff.lp*100).toFixed(2)} Rp)</th>
     <th class="tr">Grundgeb. CHF</th>
     <th class="tr">Total CHF</th></tr>`;
-  let aG=0,aT=0;
-  const rows=cM.map(m=>{
+  // compute grid totals per meter first (needed for proportional base split)
+  const meterGrid = cM.map(m => {
     let g=0; Object.values(agg[m.messpunktNr]||{}).forEach(d=>g+=d.grid);
-    const ec=g*tariff.ep,nc=g*tariff.np,lc=g*tariff.lp,bc=mc*tariff.bp,total=ec+nc+lc+bc;
+    return g;
+  });
+  const totalGrid = meterGrid.reduce((s,g)=>s+g,0);
+  const totalBase = mc * tariff.bp; // one pool to split (or multiply per meter)
+
+  let aG=0,aT=0;
+  const rows=cM.map((m,i)=>{
+    const g=meterGrid[i];
+    const ec=g*tariff.ep, nc=g*tariff.np, lc=g*tariff.lp;
+    const bc = tariff.splitBase
+      ? (totalGrid>0 ? (g/totalGrid)*totalBase : totalBase/cM.length)
+      : mc*tariff.bp;
+    const total=ec+nc+lc+bc;
     aG+=g; aT+=total;
     return `<tr>
       <td><div style="font-weight:700;color:var(--text)">${m.label||m.messpunktNr}</div>
