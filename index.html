@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>vZEV Stromauswertung | BKW</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* ── TOKENS ─────────────────────────────────────────────────────────────── */
+:root {
+  --blue:        #0046B0;
+  --blue-dark:   #0B2247;
+  --blue-hover:  #0055CC;
+  --blue-light:  #EBF1FB;
+  --blue-xlight: #F4F7FD;
+  --green:       #3AAA6A;
+  --green-light: #EBF7F1;
+  --amber:       #E6900A;
+  --amber-light: #FEF3DC;
+  --red:         #C0392B;
+  --red-light:   #FDECEA;
+  --bg:          #F1F4F9;
+  --surface:     #FFFFFF;
+  --border:      #D4DCEA;
+  --border-light:#E8EDF5;
+  --text:        #0B1826;
+  --text-mid:    #3D4F6B;
+  --text-muted:  #7A8CA8;
+  --text-faint:  #B0BCCF;
+  --radius:      2px;
+  --radius-md:   4px;
+  --shadow:      0 1px 4px rgba(4,36,86,.07);
+  --shadow-md:   0 2px 12px rgba(4,36,86,.09);
+  --transition:  .18s ease;
+}
+
+/* ── RESET ──────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; -webkit-font-smoothing: antialiased; }
+body { font-family: 'Manrope', sans-serif; background: var(--bg); color: var(--text); line-height: 1.55; }
+
+/* ── TOPBAR ─────────────────────────────────────────────────────────────── */
+.topbar {
+  background: var(--blue-dark);
+  height: 3px;
+}
+
+/* ── NAV ────────────────────────────────────────────────────────────────── */
+nav {
+  background: var(--blue-dark);
+  padding: 0 2.5rem;
+  display: flex;
+  align-items: center;
+  height: 64px;
+  gap: 2.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.nav-logo-mark {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-logo-text {
+  color: #fff;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -.02em;
+}
+
+.nav-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255,255,255,.18);
+}
+
+.nav-title {
+  color: rgba(255,255,255,.7);
+  font-size: .82rem;
+  font-weight: 500;
+  letter-spacing: .01em;
+}
+
+.nav-badge {
+  margin-left: auto;
+  background: var(--blue);
+  color: #fff;
+  font-size: .7rem;
+  font-weight: 700;
+  padding: .2rem .65rem;
+  border-radius: var(--radius);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+/* ── PAGE HEADER ────────────────────────────────────────────────────────── */
+.page-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-light);
+  padding: 2rem 2.5rem 1.75rem;
+}
+
+.page-header-inner {
+  max-width: 1160px;
+  margin: 0 auto;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: .75rem;
+  color: var(--text-muted);
+  margin-bottom: .75rem;
+}
+
+.breadcrumb a { color: var(--blue); text-decoration: none; }
+.breadcrumb a:hover { text-decoration: underline; }
+.breadcrumb span { color: var(--text-faint); }
+
+.page-header h1 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -.025em;
+  margin-bottom: .25rem;
+}
+
+.page-header p {
+  font-size: .85rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* ── STEPPER ────────────────────────────────────────────────────────────── */
+.stepper-wrap {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-light);
+  padding: 0 2.5rem;
+}
+
+.stepper {
+  max-width: 1160px;
+  margin: 0 auto;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  padding: .9rem 0;
+  padding-right: 2.5rem;
+  border-bottom: 2px solid transparent;
+  cursor: default;
+  transition: var(--transition);
+  position: relative;
+}
+
+.step.active { border-bottom-color: var(--blue); }
+.step.done   { border-bottom-color: var(--green); }
+
+.step-circle {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .72rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  background: var(--border);
+  color: var(--text-muted);
+  transition: var(--transition);
+}
+
+.step.active .step-circle { background: var(--blue); color: #fff; }
+.step.done   .step-circle { background: var(--green); color: #fff; }
+
+.step-label {
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.step.active .step-label { color: var(--blue); }
+.step.done   .step-label { color: var(--green); }
+
+/* ── MAIN ───────────────────────────────────────────────────────────────── */
+main {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 2rem 2.5rem 4rem;
+}
+
+/* ── SECTION ────────────────────────────────────────────────────────────── */
+.section { margin-bottom: 1.5rem; }
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: .75rem;
+  margin-bottom: 1.25rem;
+}
+
+.section-num {
+  font-size: .7rem;
+  font-weight: 800;
+  color: var(--blue);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: .2rem .55rem;
+  background: var(--blue-light);
+  border-radius: var(--radius);
+  flex-shrink: 0;
+}
+
+.section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -.01em;
+}
+
+.section-desc {
+  font-size: .8rem;
+  color: var(--text-muted);
+  margin-top: .2rem;
+  font-weight: 500;
+}
+
+/* ── CARD ───────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1.75rem 2rem;
+  box-shadow: var(--shadow);
+  margin-bottom: 1.5rem;
+}
+
+.card-head {
+  font-size: .8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-light);
+}
+
+/* ── UPLOAD ZONE ────────────────────────────────────────────────────────── */
+.upload-zone {
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius-md);
+  padding: 2.5rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: var(--transition);
+  background: var(--blue-xlight);
+}
+
+.upload-zone:hover, .upload-zone.drag-over {
+  border-color: var(--blue);
+  background: var(--blue-light);
+}
+
+.upload-icon {
+  width: 44px;
+  height: 44px;
+  background: var(--blue-light);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: .9rem;
+  transition: var(--transition);
+}
+
+.upload-zone:hover .upload-icon, .upload-zone.drag-over .upload-icon {
+  background: var(--blue);
+  border-color: var(--blue);
+}
+
+.upload-icon svg { transition: var(--transition); }
+.upload-zone:hover .upload-icon svg path, .upload-zone.drag-over .upload-icon svg path { stroke: #fff; }
+
+.upload-zone h3 { font-size: .95rem; font-weight: 700; color: var(--text); margin-bottom: .3rem; }
+.upload-zone p  { font-size: .78rem; color: var(--text-muted); font-weight: 500; }
+
+/* ── ALERTS ─────────────────────────────────────────────────────────────── */
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: .6rem;
+  padding: .8rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: .82rem;
+  font-weight: 500;
+  border-left: 3px solid;
+}
+
+.alert-icon { font-size: .9rem; flex-shrink: 0; margin-top: .05rem; }
+.alert.ai { background: var(--blue-light); color: #1740A0; border-color: var(--blue); }
+.alert.as { background: var(--green-light); color: #1A6B3C; border-color: var(--green); }
+.alert.aw { background: var(--amber-light); color: #8A4F00; border-color: var(--amber); }
+.alert.ae { background: var(--red-light);   color: #8A1A1A; border-color: var(--red); }
+
+/* ── METER CONFIG ───────────────────────────────────────────────────────── */
+.meter-config-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 1rem; }
+
+.meter-cfg-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  background: var(--surface);
+  transition: var(--transition);
+  position: relative;
+}
+
+.meter-cfg-card:hover { border-color: #b5c6e0; box-shadow: var(--shadow); }
+
+.meter-cfg-card .mpid {
+  font-size: .67rem;
+  font-family: 'SF Mono', 'Consolas', monospace;
+  color: var(--text-faint);
+  word-break: break-all;
+  margin-bottom: .75rem;
+  line-height: 1.4;
+  background: var(--bg);
+  padding: .35rem .5rem;
+  border-radius: var(--radius);
+}
+
+.meter-cfg-card .cfg-row { display: flex; gap: .75rem; margin-bottom: .65rem; flex-wrap: wrap; }
+.meter-cfg-card label { display: block; font-size: .72rem; font-weight: 700; color: var(--text-mid); margin-bottom: .3rem; letter-spacing: .02em; text-transform: uppercase; }
+
+.meter-cfg-card input,
+.meter-cfg-card select {
+  width: 100%;
+  padding: .5rem .7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: .83rem;
+  font-family: 'Manrope', sans-serif;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--surface);
+  outline: none;
+  transition: var(--transition);
+  -webkit-appearance: none;
+}
+
+.meter-cfg-card input:focus,
+.meter-cfg-card select:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(0,70,176,.1);
+}
+
+.type-sel select.verbrauch { color: var(--blue); font-weight: 700; }
+.type-sel select.produktion { color: var(--green); font-weight: 700; }
+.type-sel select.ignore { color: var(--text-muted); }
+
+.found-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  font-size: .67rem;
+  padding: .18rem .5rem;
+  border-radius: var(--radius);
+  font-weight: 700;
+  background: var(--green-light);
+  color: #1A6B3C;
+  margin-bottom: .6rem;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+
+.meter-stats {
+  font-size: .72rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  border-top: 1px solid var(--border-light);
+  margin-top: .75rem;
+  padding-top: .65rem;
+  line-height: 1.7;
+}
+
+/* ── SUMMARY TILES ──────────────────────────────────────────────────────── */
+.sum-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 1px; margin-bottom: 1.5rem; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+
+.sum-card {
+  background: var(--surface);
+  padding: 1.4rem 1.5rem;
+  position: relative;
+  transition: var(--transition);
+}
+
+.sum-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--blue);
+}
+
+.sum-card.g::before { background: var(--green); }
+.sum-card.o::before { background: var(--amber); }
+.sum-card.p::before { background: #7C5CBF; }
+.sum-card.r::before { background: var(--red); }
+
+.slabel { font-size: .67rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .07em; margin-bottom: .5rem; }
+.sval { font-size: 1.75rem; font-weight: 800; color: var(--text); letter-spacing: -.03em; line-height: 1; }
+.sunit { font-size: .73rem; color: var(--text-muted); font-weight: 500; margin-top: .35rem; }
+
+/* ── TARIFF ─────────────────────────────────────────────────────────────── */
+.tariff-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; }
+
+.tfield label { display: block; font-size: .72rem; font-weight: 700; color: var(--text-mid); margin-bottom: .3rem; letter-spacing: .02em; text-transform: uppercase; }
+.tfield input {
+  width: 100%;
+  padding: .55rem .8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: .9rem;
+  font-family: 'Manrope', sans-serif;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface);
+  outline: none;
+  transition: var(--transition);
+}
+.tfield input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,70,176,.1); }
+.tfield .suffix { font-size: .72rem; color: var(--text-muted); font-weight: 500; margin-top: .3rem; }
+
+.tariff-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  background: var(--blue-light);
+  color: var(--blue);
+  font-size: .73rem;
+  font-weight: 700;
+  padding: .25rem .7rem;
+  border-radius: var(--radius);
+  letter-spacing: .03em;
+  margin-bottom: 1.25rem;
+}
+
+/* ── BUTTONS ────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .6rem 1.35rem;
+  border-radius: var(--radius);
+  font-family: 'Manrope', sans-serif;
+  font-size: .83rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: var(--transition);
+  letter-spacing: .01em;
+}
+
+.btn-primary { background: var(--blue); color: #fff; }
+.btn-primary:hover { background: var(--blue-hover); }
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-mid);
+}
+.btn-outline:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-xlight); }
+
+.btn-sm { padding: .4rem .9rem; font-size: .77rem; }
+
+/* ── TABLES ─────────────────────────────────────────────────────────────── */
+.table-wrap { overflow-x: auto; margin: 0 -2rem; padding: 0 2rem; }
+
+table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+
+thead th {
+  background: var(--bg);
+  padding: .65rem .85rem;
+  text-align: left;
+  font-size: .68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+tbody td {
+  padding: .6rem .85rem;
+  border-bottom: 1px solid var(--border-light);
+  color: var(--text-mid);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: var(--blue-xlight); }
+
+tr.tfoot td {
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  border-bottom: none;
+  font-weight: 700;
+  color: var(--text);
+  font-size: .83rem;
+}
+
+.tr { text-align: right; }
+.tg { color: var(--green); font-weight: 600; }
+.tb { color: var(--blue); }
+.tc { font-weight: 700; color: var(--text); }
+
+/* ── CHARTS ─────────────────────────────────────────────────────────────── */
+.chart-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 1.5rem; }
+@media (max-width: 700px) { .chart-grid { grid-template-columns: 1fr; } }
+.chart-box { position: relative; }
+.chart-label { font-size: .73rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: .75rem; }
+
+/* ── PERIOD INFO ────────────────────────────────────────────────────────── */
+.period-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: .75rem 1.25rem;
+  margin-bottom: 1.5rem;
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--text-mid);
+}
+
+.period-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+
+/* ── HIDDEN ─────────────────────────────────────────────────────────────── */
+.hidden { display: none; }
+
+/* ── FOOTER ─────────────────────────────────────────────────────────────── */
+footer {
+  background: var(--blue-dark);
+  color: rgba(255,255,255,.4);
+  text-align: center;
+  padding: 1.5rem 2rem;
+  font-size: .73rem;
+  font-weight: 500;
+  letter-spacing: .02em;
+}
+
+footer strong { color: rgba(255,255,255,.7); font-weight: 700; }
+</style>
+</head>
+<body>
+
+<div class="topbar"></div>
+
+<!-- ── NAV ──────────────────────────────────────────────────────────────── -->
+<nav>
+  <a href="#" class="nav-logo">
+    <div class="nav-logo-mark">
+      <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+        <rect width="34" height="34" rx="4" fill="#fff" fill-opacity=".1"/>
+        <path d="M8 25L17 9L26 25H8Z" fill="white" fill-opacity=".9"/>
+        <path d="M13 25L17 18L21 25H13Z" fill="#0046B0"/>
+      </svg>
+    </div>
+    <span class="nav-logo-text">BKW</span>
+  </a>
+  <div class="nav-divider"></div>
+  <span class="nav-title">Kundenportal · vZEV Stromauswertung</span>
+  <span class="nav-badge">Energy Blue</span>
+</nav>
+
+<!-- ── PAGE HEADER ───────────────────────────────────────────────────────── -->
+<div class="page-header">
+  <div class="page-header-inner">
+    <div class="breadcrumb">
+      <a href="#">Mein BKW</a>
+      <span>›</span>
+      <a href="#">Zusammenschluss zum Eigenverbrauch</a>
+      <span>›</span>
+      <span>Auswertung</span>
+    </div>
+    <h1>vZEV Stromauswertung</h1>
+    <p>Messdaten hochladen und Eigenverbrauchsauswertung erstellen · Ogimatte, 3713 Reichenbach im Kandertal</p>
+  </div>
+</div>
+
+<!-- ── STEPPER ───────────────────────────────────────────────────────────── -->
+<div class="stepper-wrap">
+  <div class="stepper">
+    <div class="step active" id="step1">
+      <div class="step-circle">1</div>
+      <div class="step-label">Daten hochladen</div>
+    </div>
+    <div class="step" id="step2">
+      <div class="step-circle">2</div>
+      <div class="step-label">Messpunkte konfigurieren</div>
+    </div>
+    <div class="step" id="step3">
+      <div class="step-circle">3</div>
+      <div class="step-label">Auswertung</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MAIN ──────────────────────────────────────────────────────────────── -->
+<main>
+
+<!-- SECTION 1: Upload -->
+<div class="section">
+  <div class="section-head">
+    <span class="section-num">Schritt 1</span>
+    <div>
+      <div class="section-title">Messdaten hochladen</div>
+      <div class="section-desc">BKW-Exportdatei mit 15-Minuten-Intervalldaten (XLSX)</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="alert ai" style="margin-bottom:1.25rem">
+      <span class="alert-icon">ℹ</span>
+      <span>Laden Sie die Excel-Exportdatei von BKW hoch. Erwartete Spalten: <strong>Messpunkt</strong>, <strong>Datum</strong>, <strong>Strombezug [kWh]</strong>, <strong>Stromeinspeisung [kWh]</strong>. Eine Datei kann mehrere Messpunkte enthalten.</span>
+    </div>
+
+    <div class="upload-zone" id="uploadZone">
+      <div class="upload-icon">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M10 13V4M10 4L7 7M10 4L13 7" stroke="#0046B0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M3 14v1.5A1.5 1.5 0 004.5 17h11a1.5 1.5 0 001.5-1.5V14" stroke="#0046B0" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h3>Datei hierher ziehen oder klicken zum Auswählen</h3>
+      <p>Excel (.xlsx) · CSV &nbsp;·&nbsp; Max. Grösse nicht begrenzt</p>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none">
+    </div>
+
+    <div id="uploadStatus" class="hidden" style="margin-top:1rem"></div>
+  </div>
+</div>
+
+<!-- SECTION 2: Meter Config -->
+<div class="section hidden" id="meterConfigCard">
+  <div class="section-head">
+    <span class="section-num">Schritt 2</span>
+    <div>
+      <div class="section-title">Messpunkte konfigurieren</div>
+      <div class="section-desc">Typ und Bezeichnung für jeden erkannten Messpunkt festlegen</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="alert ai" id="meterConfigInfo" style="margin-bottom:1.25rem">
+      <span class="alert-icon">ℹ</span><span></span>
+    </div>
+    <div class="meter-config-grid" id="meterConfigGrid"></div>
+    <div style="margin-top:1.25rem; display:flex; align-items:center; gap:1rem; padding-top:1.25rem; border-top:1px solid var(--border-light)">
+      <button class="btn btn-primary" onclick="calculateAndRender()">
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="2" y="2" width="4" height="4" rx="0.5" fill="currentColor"/><rect x="9" y="2" width="4" height="4" rx="0.5" fill="currentColor"/><rect x="2" y="9" width="4" height="4" rx="0.5" fill="currentColor"/><rect x="9" y="9" width="4" height="4" rx="0.5" fill="currentColor"/></svg>
+        Auswertung erstellen
+      </button>
+      <span style="font-size:.75rem;color:var(--text-muted);font-weight:500">Mindestens ein Verbrauch- und ein Produktions-Messpunkt erforderlich</span>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 3: Tariff -->
+<div class="section">
+  <div class="section-head">
+    <span class="section-num">Schritt 3</span>
+    <div>
+      <div class="section-title">Tarif-Konfiguration</div>
+      <div class="section-desc">Aktuelle BKW-Tarifdaten 2026 · bei Bedarf anpassbar</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="tariff-tag">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M6 3.5v2.5l1.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+      BKW Energy Blue 2026 · Energiebezug &lt; 50 MWh/a · NE7
+    </div>
+    <div class="tariff-grid">
+      <div class="tfield">
+        <label>Energiepreis Energy Blue</label>
+        <input type="number" id="energyPrice" value="10.02" step="0.01" min="0">
+        <div class="suffix">Rp/kWh</div>
+      </div>
+      <div class="tfield">
+        <label>Grundpreis</label>
+        <input type="number" id="basePrice" value="3.25" step="0.01" min="0">
+        <div class="suffix">CHF/Monat pro Verbrauchszähler</div>
+      </div>
+      <div class="tfield">
+        <label>Netznutzung Arbeit</label>
+        <input type="number" id="networkPrice" value="7.20" step="0.01" min="0">
+        <div class="suffix">Rp/kWh <span style="color:var(--amber);font-weight:700">· bitte prüfen</span></div>
+      </div>
+      <div class="tfield">
+        <label>KEV / Bundesabgaben</label>
+        <input type="number" id="levyPrice" value="2.30" step="0.01" min="0">
+        <div class="suffix">Rp/kWh</div>
+      </div>
+      <div class="tfield">
+        <label>Rückliefervergütung</label>
+        <input type="number" id="feedInPrice" value="0" step="0.01" min="0">
+        <div class="suffix">Rp/kWh Netzeinspeisung</div>
+      </div>
+    </div>
+    <p style="margin-top:1rem;font-size:.73rem;color:var(--text-muted);font-weight:500">
+      Energiepreis und Grundpreis aus BKW-Tarifdaten 2026 (tarife-json). Netznutzungstarif gemäss aktuellem BKW-Dokument prüfen und ggf. anpassen.
+    </p>
+  </div>
+</div>
+
+<!-- SECTION 4: Results -->
+<div id="results" class="hidden">
+
+  <div class="section-head" style="margin-top:.5rem">
+    <span class="section-num" style="background:var(--green-light);color:var(--green)">Ergebnis</span>
+    <div>
+      <div class="section-title">Auswertung</div>
+      <div class="section-desc" id="periodInfo"></div>
+    </div>
+    <div style="margin-left:auto">
+      <button class="btn btn-outline btn-sm" onclick="exportCSV()">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 9L3 5.5h2.5V2h2V5.5H10L6.5 9Z" fill="currentColor"/><path d="M1 10.5h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        CSV Export
+      </button>
+    </div>
+  </div>
+
+  <!-- Summary tiles -->
+  <div class="sum-grid" id="summaryCards"></div>
+
+  <!-- Charts -->
+  <div class="card" style="margin-bottom:1.5rem">
+    <div class="card-head">Energiefluss · Übersicht</div>
+    <div class="chart-grid">
+      <div class="chart-box">
+        <div class="chart-label">Monatlicher Energiefluss</div>
+        <canvas id="chartMonthly"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-label">Energieverteilung gesamt</div>
+        <canvas id="chartPie"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Monthly table -->
+  <div class="card" style="margin-bottom:1.5rem">
+    <div class="card-head">Monatliche Auswertung</div>
+    <div class="table-wrap">
+      <table id="monthlyTable"><thead></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <!-- Per-meter table -->
+  <div class="card" style="margin-bottom:1.5rem">
+    <div class="card-head">Auswertung pro Messpunkt</div>
+    <div class="table-wrap">
+      <table id="meterTable"><thead></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <!-- Cost table -->
+  <div class="card">
+    <div class="card-head">Kostenabrechnung pro Verbrauchszähler</div>
+    <div class="table-wrap">
+      <table id="costTable"><thead></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+</div>
+
+</main>
+
+<footer>
+  <strong>BKW Energie AG</strong> · vZEV Stromauswertung · Energy Blue · Reichenbach im Kandertal
+</footer>
+
+<!-- ── SCRIPT ─────────────────────────────────────────────────────────────── -->
+<script>
+// ── KNOWN METERS ───────────────────────────────────────────────────────────
+const KNOWN = [
+  { messpunktNr:'CH1022201234500000000000000092766', zaehlerNr:'10781966', typ:'Verbrauch',  label:'Ogimatte 10',          adresse:'Ogimatte 10, 3713 Reichenbach im Kandertal' },
+  { messpunktNr:'CH1022201234500000000000000524698', zaehlerNr:'10754964', typ:'Verbrauch',  label:'Ogimatte 7 (Verbrauch)',adresse:'Ogimatte 7, 3713 Reichenbach im Kandertal' },
+  { messpunktNr:'CH1022201234500000000000000524699', zaehlerNr:'10754964', typ:'Produktion', label:'Ogimatte 7 (Solar)',    adresse:'Ogimatte 7, 3713 Reichenbach im Kandertal' }
+];
+
+let parsedData = [];
+let detectedMPs = [];
+let chartMonthly = null, chartPie = null;
+
+// ── INIT ────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  setupUpload();
+  document.querySelectorAll('#energyPrice,#basePrice,#networkPrice,#levyPrice,#feedInPrice')
+    .forEach(el => el.addEventListener('change', () => { if (parsedData.length) calculateAndRender(); }));
+});
+
+function setStep(n) {
+  [1,2,3].forEach(i => {
+    const el = document.getElementById('step'+i);
+    el.className = 'step' + (i < n ? ' done' : i === n ? ' active' : '');
+  });
+}
+
+// ── UPLOAD ──────────────────────────────────────────────────────────────────
+function setupUpload() {
+  const zone = document.getElementById('uploadZone');
+  const input = document.getElementById('fileInput');
+  zone.addEventListener('click', () => input.click());
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag-over'); if (e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]); });
+  input.addEventListener('change', () => { if (input.files[0]) processFile(input.files[0]); });
+}
+
+async function processFile(file) {
+  const st = document.getElementById('uploadStatus');
+  st.className = '';
+  st.innerHTML = mkAlert('ai', `Verarbeite <strong>${file.name}</strong>…`);
+  try {
+    const rows = await readExcel(file);
+    parsedData = parseRows(rows);
+    if (!parsedData.length) {
+      st.innerHTML = mkAlert('aw', 'Keine gültigen Daten gefunden. Bitte Dateiformat prüfen.');
+      return;
+    }
+    detectedMPs = [...new Set(parsedData.map(r => r.messpunkt))].sort();
+    st.innerHTML = mkAlert('as', `${parsedData.length.toLocaleString('de-CH')} Datenpunkte · ${detectedMPs.length} Messpunkt${detectedMPs.length!==1?'e':''} erkannt aus <strong>${file.name}</strong>`);
+    buildMeterConfig();
+    document.getElementById('results').classList.add('hidden');
+    setStep(2);
+  } catch(e) {
+    st.innerHTML = mkAlert('ae', `Fehler beim Einlesen: ${e.message}`);
+    console.error(e);
+  }
+}
+
+function mkAlert(cls, html) {
+  const icons = { ai:'ℹ', as:'✓', aw:'⚠', ae:'✕' };
+  return `<div class="alert ${cls}"><span class="alert-icon">${icons[cls]}</span><span>${html}</span></div>`;
+}
+
+function readExcel(file) {
+  return new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type:'array', cellDates:true });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        res(XLSX.utils.sheet_to_json(ws, { header:1, raw:false, dateNF:'yyyy-mm-dd hh:mm' }));
+      } catch(err) { rej(err); }
+    };
+    reader.onerror = rej;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function parseRows(rows) {
+  if (rows.length < 2) return [];
+  const hdr = rows[0].map(h => String(h||'').toLowerCase().trim());
+  const cMP = hdr.findIndex(h => h.includes('messpunkt'));
+  const cD  = hdr.findIndex(h => h.includes('datum'));
+  const cB  = hdr.findIndex(h => h.includes('strombezug') || (h.includes('bezug') && !h.includes('einspeisung')));
+  const cE  = hdr.findIndex(h => h.includes('einspeisung'));
+  if (cMP<0||cD<0||cB<0) throw new Error('Spalten Messpunkt, Datum, Strombezug nicht gefunden.');
+  const out = [];
+  for (let i=1; i<rows.length; i++) {
+    const r = rows[i];
+    if (!r||!r[cMP]||!r[cD]) continue;
+    let d = r[cD] instanceof Date ? r[cD] : new Date(r[cD]);
+    if (isNaN(d)) continue;
+    out.push({ messpunkt: String(r[cMP]).trim(), datum: d, bezug: parseFloat(r[cB])||0, einspeisung: cE>=0?(parseFloat(r[cE])||0):0 });
+  }
+  return out;
+}
+
+// ── METER CONFIG ────────────────────────────────────────────────────────────
+function matchMP(raw) {
+  for (const m of KNOWN) {
+    if (raw===m.messpunktNr || raw.includes(m.messpunktNr) || m.messpunktNr.includes(raw)) return m.messpunktNr;
+  }
+  return raw;
+}
+
+function buildMeterConfig() {
+  const card = document.getElementById('meterConfigCard');
+  const grid = document.getElementById('meterConfigGrid');
+  const infoEl = document.getElementById('meterConfigInfo').querySelector('span:last-child');
+
+  const knownFound = detectedMPs.filter(mp => KNOWN.some(k => k.messpunktNr===mp || mp.includes(k.messpunktNr) || k.messpunktNr.includes(mp)));
+  infoEl.innerHTML = `${detectedMPs.length} Messpunkt${detectedMPs.length!==1?'e':''} in der Datei gefunden.` +
+    (knownFound.length ? ` <strong>${knownFound.length} bekannte${knownFound.length===1?'r':''} Messpunkt${knownFound.length!==1?'e':''}</strong> automatisch vorausgefüllt.` : '') +
+    ' Typ und Bezeichnung prüfen, dann <em>Auswertung erstellen</em> klicken.';
+
+  grid.innerHTML = detectedMPs.map((mp, i) => {
+    const known = KNOWN.find(k => k.messpunktNr===mp || mp.includes(k.messpunktNr) || k.messpunktNr.includes(mp));
+    const typ = known?.typ || 'Verbrauch';
+    const label = known?.label || '';
+    const adresse = known?.adresse || '';
+    const zaehlerNr = known?.zaehlerNr || '';
+    const mData = parsedData.filter(r => r.messpunkt === mp);
+    const totalB = mData.reduce((s,r) => s+r.bezug, 0);
+    const totalE = mData.reduce((s,r) => s+r.einspeisung, 0);
+    const dMin = new Date(Math.min(...mData.map(r=>r.datum.getTime())));
+    const dMax = new Date(Math.max(...mData.map(r=>r.datum.getTime())));
+    return `
+    <div class="meter-cfg-card">
+      ${known ? '<span class="found-badge">✓ Bekannt</span>' : ''}
+      <div class="mpid">${mp}</div>
+      <div class="cfg-row">
+        <div style="flex:0 0 130px">
+          <label>Typ</label>
+          <div class="type-sel">
+            <select id="typ_${i}" onchange="updateTypeStyle(this)">
+              <option value="Verbrauch" ${typ==='Verbrauch'?'selected':''}>↓ Verbrauch</option>
+              <option value="Produktion" ${typ==='Produktion'?'selected':''}>☀ Produktion</option>
+              <option value="ignore">— Ignorieren</option>
+            </select>
+          </div>
+        </div>
+        <div style="flex:1;min-width:110px">
+          <label>Bezeichnung</label>
+          <input type="text" id="label_${i}" value="${label}" placeholder="z. B. Ogimatte 10">
+        </div>
+      </div>
+      <div class="cfg-row">
+        <div style="flex:1">
+          <label>Adresse</label>
+          <input type="text" id="adresse_${i}" value="${adresse}" placeholder="Adresse Messpunkt">
+        </div>
+        <div style="flex:0 0 110px">
+          <label>Zählernummer</label>
+          <input type="text" id="zaehler_${i}" value="${zaehlerNr}" placeholder="z. B. 10781966">
+        </div>
+      </div>
+      <div class="meter-stats">
+        ${mData.length.toLocaleString('de-CH')} Messwerte &nbsp;·&nbsp; ${fmt(dMin)} – ${fmt(dMax)}
+        ${totalB>0 ? `&nbsp;·&nbsp; Bezug: <strong>${totalB.toFixed(1)} kWh</strong>` : ''}
+        ${totalE>0 ? `&nbsp;·&nbsp; Einspeisung: <strong>${totalE.toFixed(1)} kWh</strong>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  detectedMPs.forEach((_,i) => { const s = document.getElementById('typ_'+i); if(s) updateTypeStyle(s); });
+  card.classList.remove('hidden');
+  card.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function updateTypeStyle(sel) { sel.className = sel.value.toLowerCase(); }
+
+function getMeterConfig() {
+  return detectedMPs.map((mp, i) => ({
+    messpunktNr: mp,
+    typ: document.getElementById('typ_'+i)?.value || 'Verbrauch',
+    label: document.getElementById('label_'+i)?.value.trim() || mp.slice(-8),
+    adresse: document.getElementById('adresse_'+i)?.value.trim() || '',
+    zaehlerNr: document.getElementById('zaehler_'+i)?.value.trim() || ''
+  })).filter(m => m.typ !== 'ignore');
+}
+
+// ── vZEV CALC ───────────────────────────────────────────────────────────────
+function getTariff() {
+  const ep=parseFloat(document.getElementById('energyPrice').value)/100;
+  const bp=parseFloat(document.getElementById('basePrice').value);
+  const np=parseFloat(document.getElementById('networkPrice').value)/100;
+  const lp=parseFloat(document.getElementById('levyPrice').value)/100;
+  const fp=parseFloat(document.getElementById('feedInPrice').value)/100;
+  return { ep,bp,np,lp,fp, work:ep+np+lp };
+}
+
+function calculateAndRender() {
+  const meters = getMeterConfig();
+  const tariff = getTariff();
+  const prodMeters = meters.filter(m => m.typ==='Produktion');
+  const consMeters = meters.filter(m => m.typ==='Verbrauch');
+  if (!consMeters.length) { alert('Mindestens einen Verbrauch-Messpunkt konfigurieren.'); return; }
+  if (!prodMeters.length)  { alert('Mindestens einen Produktions-Messpunkt konfigurieren.'); return; }
+
+  const byTS = {};
+  parsedData.forEach(r => {
+    if (!meters.find(m => m.messpunktNr === r.messpunkt)) return;
+    const ts = r.datum.getTime();
+    if (!byTS[ts]) byTS[ts] = {};
+    byTS[ts][r.messpunkt] = r;
+  });
+
+  const agg = {};
+  meters.forEach(m => { agg[m.messpunktNr] = {}; });
+  const monthly = {};
+
+  Object.entries(byTS).forEach(([ts, slots]) => {
+    const d = new Date(parseInt(ts));
+    const mk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const prod = prodMeters.reduce((s,m) => { const sl=slots[m.messpunktNr]; return s+(sl?Math.max(sl.bezug,sl.einspeisung):0); },0);
+    const cons = consMeters.map(m => ({ m, c: slots[m.messpunktNr]?.bezug||0 }));
+    const totalC = cons.reduce((s,x)=>s+x.c,0);
+    const sc = Math.min(prod, totalC);
+    const fi = Math.max(0, prod-totalC);
+    cons.forEach(({m,c}) => {
+      const vzev = totalC>0 ? (c/totalC)*sc : 0;
+      if (!agg[m.messpunktNr][mk]) agg[m.messpunktNr][mk] = {cons:0,vzev:0,grid:0,prod:0};
+      agg[m.messpunktNr][mk].cons += c;
+      agg[m.messpunktNr][mk].vzev += vzev;
+      agg[m.messpunktNr][mk].grid += c-vzev;
+    });
+    prodMeters.forEach(pm => {
+      const sl=slots[pm.messpunktNr]; const pmP=sl?Math.max(sl.bezug,sl.einspeisung):0;
+      if (!agg[pm.messpunktNr][mk]) agg[pm.messpunktNr][mk] = {cons:0,vzev:0,grid:0,prod:0};
+      agg[pm.messpunktNr][mk].prod += pmP;
+    });
+    if (!monthly[mk]) monthly[mk]={cons:0,vzev:0,grid:0,prod:0,sc:0,fi:0};
+    monthly[mk].cons+=totalC; monthly[mk].prod+=prod; monthly[mk].sc+=sc; monthly[mk].fi+=fi;
+    monthly[mk].vzev+=sc; monthly[mk].grid+=totalC-sc;
+  });
+
+  const tot={cons:0,vzev:0,grid:0,prod:0,sc:0,fi:0};
+  Object.values(monthly).forEach(m=>{tot.cons+=m.cons;tot.vzev+=m.vzev;tot.grid+=m.grid;tot.prod+=m.prod;tot.sc+=m.sc;tot.fi+=m.fi;});
+  const scRate = tot.prod>0 ? tot.sc/tot.prod*100 : 0;
+  const ssRate = tot.cons>0 ? tot.vzev/tot.cons*100 : 0;
+
+  const dates = parsedData.map(r=>r.datum.getTime());
+  document.getElementById('periodInfo').textContent =
+    `${fmt(new Date(Math.min(...dates)))} – ${fmt(new Date(Math.max(...dates)))}`;
+
+  renderSummary(tot, scRate, ssRate);
+  renderMonthly(monthly, tariff, consMeters.length);
+  renderMeterAgg(agg, meters);
+  renderCosts(agg, meters, tariff);
+  renderCharts(monthly);
+  document.getElementById('results').classList.remove('hidden');
+  setStep(3);
+  document.getElementById('results').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+// ── RENDER ──────────────────────────────────────────────────────────────────
+function renderSummary(tot, scRate, ssRate) {
+  document.getElementById('summaryCards').innerHTML = `
+    <div class="sum-card">  <div class="slabel">Gesamtverbrauch</div>  <div class="sval">${tot.cons.toFixed(0)}</div><div class="sunit">kWh</div></div>
+    <div class="sum-card g"><div class="slabel">Produktion Solar</div>  <div class="sval">${tot.prod.toFixed(0)}</div><div class="sunit">kWh</div></div>
+    <div class="sum-card g"><div class="slabel">vZEV Eigenverbrauch</div><div class="sval">${tot.vzev.toFixed(0)}</div><div class="sunit">kWh &nbsp;·&nbsp; ${ssRate.toFixed(1)}% Eigendeckung</div></div>
+    <div class="sum-card o"><div class="slabel">Netzbezug</div>         <div class="sval">${tot.grid.toFixed(0)}</div><div class="sunit">kWh</div></div>
+    <div class="sum-card p"><div class="slabel">Eigenverbrauchsquote</div><div class="sval">${scRate.toFixed(1)}%</div><div class="sunit">der Produktion genutzt</div></div>
+    <div class="sum-card r"><div class="slabel">Netzeinspeisung</div>   <div class="sval">${tot.fi.toFixed(0)}</div><div class="sunit">kWh Überschuss</div></div>`;
+}
+
+function getMonthCount() {
+  if (!parsedData.length) return 1;
+  const ts=parsedData.map(r=>r.datum.getTime());
+  const a=new Date(Math.min(...ts)), b=new Date(Math.max(...ts));
+  return Math.max(1,(b.getFullYear()-a.getFullYear())*12+b.getMonth()-a.getMonth()+1);
+}
+
+function renderMonthly(monthly, tariff, nV) {
+  const months=Object.keys(monthly).sort();
+  document.querySelector('#monthlyTable thead').innerHTML=`<tr>
+    <th>Monat</th><th class="tr">Verbrauch kWh</th><th class="tr">Produktion kWh</th>
+    <th class="tr">vZEV-Anteil kWh</th><th class="tr">Netzbezug kWh</th>
+    <th class="tr">Eigendeckung</th><th class="tr">Einspeisung kWh</th>
+    <th class="tr">Grundgeb. CHF</th><th class="tr">Energiekost. CHF</th>
+    <th class="tr">Total CHF</th></tr>`;
+  let sC=0,sP=0,sV=0,sG=0,sF=0,sB=0,sE=0,sT=0;
+  document.querySelector('#monthlyTable tbody').innerHTML=months.map(mk=>{
+    const d=monthly[mk];
+    const eigen=d.cons>0?d.vzev/d.cons*100:0;
+    const base=nV*tariff.bp, ec=d.grid*tariff.work, fi=d.fi*tariff.fp, total=base+ec-fi;
+    sC+=d.cons;sP+=d.prod;sV+=d.vzev;sG+=d.grid;sF+=d.fi;sB+=base;sE+=ec;sT+=total;
+    return `<tr><td><strong>${fmtMonth(mk)}</strong></td>
+      <td class="tr">${d.cons.toFixed(1)}</td><td class="tr tg">${d.prod.toFixed(1)}</td>
+      <td class="tr">${d.vzev.toFixed(1)}</td><td class="tr">${d.grid.toFixed(1)}</td>
+      <td class="tr">${eigen.toFixed(1)}%</td><td class="tr">${d.fi.toFixed(1)}</td>
+      <td class="tr">${fmtCHF(base)}</td><td class="tr">${fmtCHF(ec)}</td>
+      <td class="tr tc">${fmtCHF(total)}</td></tr>`;
+  }).join('')+`<tr class="tfoot">
+    <td>Total</td><td class="tr">${sC.toFixed(1)}</td><td class="tr tg">${sP.toFixed(1)}</td>
+    <td class="tr">${sV.toFixed(1)}</td><td class="tr">${sG.toFixed(1)}</td>
+    <td class="tr">${sC>0?(sV/sC*100).toFixed(1):0}%</td><td class="tr">${sF.toFixed(1)}</td>
+    <td class="tr">${fmtCHF(sB)}</td><td class="tr">${fmtCHF(sE)}</td>
+    <td class="tr tc">${fmtCHF(sT)}</td></tr>`;
+}
+
+function renderMeterAgg(agg, meters) {
+  document.querySelector('#meterTable thead').innerHTML=`<tr>
+    <th>Bezeichnung</th><th>Messpunkt</th><th>Typ</th>
+    <th class="tr">Verbrauch kWh</th><th class="tr">Produktion kWh</th>
+    <th class="tr">vZEV-Anteil kWh</th><th class="tr">Netzbezug kWh</th><th class="tr">Eigendeckung</th></tr>`;
+  document.querySelector('#meterTable tbody').innerHTML=meters.map(m=>{
+    let c=0,v=0,g=0,p=0;
+    Object.values(agg[m.messpunktNr]||{}).forEach(d=>{c+=d.cons;v+=d.vzev;g+=d.grid;p+=d.prod;});
+    const isP=m.typ==='Produktion';
+    const typeTag=`<span style="font-size:.68rem;font-weight:700;padding:.18rem .5rem;border-radius:2px;${isP?'background:var(--green-light);color:var(--green)':'background:var(--blue-light);color:var(--blue)'}">${m.typ}</span>`;
+    return `<tr>
+      <td><div style="font-weight:700;color:var(--text)">${m.label||'–'}</div>${m.adresse?`<div style="font-size:.72rem;color:var(--text-muted)">${m.adresse}</div>`:''}</td>
+      <td style="font-size:.65rem;font-family:monospace;color:var(--text-faint);max-width:160px;overflow:hidden;text-overflow:ellipsis">${m.messpunktNr}</td>
+      <td>${typeTag}</td>
+      <td class="tr">${!isP?c.toFixed(1):'–'}</td>
+      <td class="tr tg">${p>0?p.toFixed(1):'–'}</td>
+      <td class="tr">${!isP?v.toFixed(1):'–'}</td>
+      <td class="tr">${!isP?g.toFixed(1):'–'}</td>
+      <td class="tr">${!isP?(c>0?v/c*100:0).toFixed(1)+'%':'–'}</td></tr>`;
+  }).join('');
+}
+
+function renderCosts(agg, meters, tariff) {
+  const mc=getMonthCount();
+  const cM=meters.filter(m=>m.typ==='Verbrauch');
+  document.querySelector('#costTable thead').innerHTML=`<tr>
+    <th>Zähler / Adresse</th>
+    <th class="tr">Netzbezug kWh</th>
+    <th class="tr">Energie (${(tariff.ep*100).toFixed(2)} Rp)</th>
+    <th class="tr">Netznutzg. (${(tariff.np*100).toFixed(2)} Rp)</th>
+    <th class="tr">KEV (${(tariff.lp*100).toFixed(2)} Rp)</th>
+    <th class="tr">Grundgeb. CHF</th>
+    <th class="tr">Total CHF</th></tr>`;
+  let aG=0,aT=0;
+  const rows=cM.map(m=>{
+    let g=0; Object.values(agg[m.messpunktNr]||{}).forEach(d=>g+=d.grid);
+    const ec=g*tariff.ep,nc=g*tariff.np,lc=g*tariff.lp,bc=mc*tariff.bp,total=ec+nc+lc+bc;
+    aG+=g; aT+=total;
+    return `<tr>
+      <td><div style="font-weight:700;color:var(--text)">${m.label||m.messpunktNr}</div>
+        ${m.adresse?`<div style="font-size:.72rem;color:var(--text-muted)">${m.adresse}</div>`:''}
+        ${m.zaehlerNr?`<div style="font-size:.65rem;color:var(--text-faint)">Zähler ${m.zaehlerNr}</div>`:''}</td>
+      <td class="tr">${g.toFixed(1)}</td>
+      <td class="tr">${fmtCHF(ec)}</td><td class="tr">${fmtCHF(nc)}</td>
+      <td class="tr">${fmtCHF(lc)}</td><td class="tr">${fmtCHF(bc)}</td>
+      <td class="tr tc">${fmtCHF(total)}</td></tr>`;
+  });
+  rows.push(`<tr class="tfoot"><td>Total</td><td class="tr">${aG.toFixed(1)}</td>
+    <td class="tr">–</td><td class="tr">–</td><td class="tr">–</td><td class="tr">–</td>
+    <td class="tr tc">${fmtCHF(aT)}</td></tr>`);
+  document.querySelector('#costTable tbody').innerHTML=rows.join('');
+}
+
+function renderCharts(monthly) {
+  const months=Object.keys(monthly).sort();
+  const labels=months.map(fmtMonth);
+  if (chartMonthly) chartMonthly.destroy();
+  if (chartPie) chartPie.destroy();
+  Chart.defaults.font.family = 'Manrope';
+  Chart.defaults.color = '#7A8CA8';
+  chartMonthly=new Chart(document.getElementById('chartMonthly'),{
+    type:'bar',
+    data:{ labels, datasets:[
+      { label:'Netzbezug (kWh)', data:months.map(m=>+monthly[m].grid.toFixed(1)), backgroundColor:'#0046B0', borderRadius:2, barPercentage:.7 },
+      { label:'vZEV-Eigenverbrauch (kWh)', data:months.map(m=>+monthly[m].vzev.toFixed(1)), backgroundColor:'#3AAA6A', borderRadius:2, barPercentage:.7 },
+      { label:'Netzeinspeisung (kWh)', data:months.map(m=>+monthly[m].fi.toFixed(1)), backgroundColor:'#E6900A', borderRadius:2, barPercentage:.7 }
+    ]},
+    options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{ font:{size:11,weight:'600'}, boxWidth:10, boxHeight:10 } } },
+      scales:{ x:{ grid:{display:false}, ticks:{font:{size:11}} }, y:{ grid:{color:'#EBF1FB', lineWidth:1}, border:{display:false}, ticks:{font:{size:11}} } } }
+  });
+  const tG=Object.values(monthly).reduce((s,m)=>s+m.grid,0);
+  const tV=Object.values(monthly).reduce((s,m)=>s+m.vzev,0);
+  const tF=Object.values(monthly).reduce((s,m)=>s+m.fi,0);
+  chartPie=new Chart(document.getElementById('chartPie'),{
+    type:'doughnut',
+    data:{ labels:['Netzbezug','vZEV-Eigenverbrauch','Netzeinspeisung'],
+      datasets:[{ data:[+tG.toFixed(1),+tV.toFixed(1),+tF.toFixed(1)],
+        backgroundColor:['#0046B0','#3AAA6A','#E6900A'], borderWidth:3, borderColor:'#fff', hoverBorderColor:'#fff' }] },
+    options:{ responsive:true, cutout:'62%',
+      plugins:{ legend:{ position:'bottom', labels:{ font:{size:11,weight:'600'}, boxWidth:10, boxHeight:10 } } } }
+  });
+}
+
+// ── EXPORT ───────────────────────────────────────────────────────────────────
+function exportCSV() {
+  const rows=[];
+  document.querySelectorAll('#monthlyTable tr').forEach(tr=>{
+    rows.push([...tr.querySelectorAll('th,td')].map(td=>'"'+td.innerText.replace(/\n/g,' ').replace(/"/g,'""')+'"').join(';'));
+  });
+  const blob=new Blob(['\uFEFF'+rows.join('\n')],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`vZEV_Auswertung_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+// ── HELPERS ──────────────────────────────────────────────────────────────────
+function fmt(d) { return d.toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit',year:'numeric'}); }
+function fmtMonth(mk) { const [y,m]=mk.split('-'); return new Date(+y,+m-1,1).toLocaleDateString('de-CH',{month:'short',year:'numeric'}); }
+function fmtCHF(v) { return v.toLocaleString('de-CH',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+</script>
+</body>
+</html>
