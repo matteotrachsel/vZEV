@@ -13,15 +13,20 @@ function exportPDF() {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
   const { agg, monthly, tot, scRate, ssRate, meters, tariff, periodStart, periodEnd } = result;
-  const cM        = meters.filter(m => m.typ === 'Verbrauch');
-  const mc        = getMonthCount();
-  const totalBase = mc * tariff.bp;
+  const cM      = meters.filter(m => m.typ === 'Verbrauch');
+  const mc      = getMonthCount();
+  const totalFee = mc * (tariff.grundtarif + tariff.pvshareAbo);
 
-  // Pre-compute grid totals (needed for proportional base-fee split).
+  // Pre-compute per-meter grid totals (needed for proportional fee split).
   const meterGrid = cM.map(m => {
     let g = 0;
     Object.values(agg[m.messpunktNr] || {}).forEach(d => { g += d.grid; });
     return g;
+  });
+  const meterVzev = cM.map(m => {
+    let v = 0;
+    Object.values(agg[m.messpunktNr] || {}).forEach(d => { v += d.vzev; });
+    return v;
   });
   const totalGrid = meterGrid.reduce((s, g) => s + g, 0);
 
@@ -34,21 +39,21 @@ function exportPDF() {
   cM.forEach((m, idx) => {
     if (idx > 0) doc.addPage();
 
-    const g  = meterGrid[idx];
-    let cons = 0, vzev = 0;
-    Object.values(agg[m.messpunktNr] || {}).forEach(d => { cons += d.cons; vzev += d.vzev; });
+    const g   = meterGrid[idx];
+    const v   = meterVzev[idx];
+    let cons  = 0;
+    Object.values(agg[m.messpunktNr] || {}).forEach(d => { cons += d.cons; });
 
-    const ec    = g * tariff.ep;
-    const nc    = g * tariff.np;
-    const lc    = g * tariff.lp;
-    const bc    = tariff.splitBase
-      ? (totalGrid > 0 ? (g / totalGrid) * totalBase : totalBase / cM.length)
-      : mc * tariff.bp;
-    const total = ec + nc + lc + bc;
+    const eb    = g * tariff.energyAllIn;
+    const vz    = v * tariff.vzevPrice;
+    const fee   = tariff.splitBase
+      ? (totalGrid > 0 ? (g / totalGrid) * cM.length * totalFee : totalFee)
+      : totalFee;
+    const total = eb + vz + fee;
     const invNr = `${invBase}-${String(idx + 1).padStart(2, '0')}`;
 
     drawInvoicePage(doc, {
-      m, g, cons, vzev, ec, nc, lc, bc, total,
+      m, g, v, cons, eb, vz, fee, total,
       tariff, mc, periodStr, dateStr, invNr,
       scRate, ssRate, tot
     });
@@ -155,11 +160,11 @@ function drawInvoicePage(doc, p) {
 
   // ── Energy summary boxes ──────────────────────────────────────────────────
   y = 95;
-  const eigenPct = p.cons > 0 ? (p.vzev / p.cons * 100).toFixed(1) : '0.0';
+  const eigenPct = p.cons > 0 ? (p.v / p.cons * 100).toFixed(1) : '0.0';
   const summaryBoxes = [
-    { label: 'Gesamtverbrauch',         val: p.cons.toFixed(1),   unit: 'kWh',         color: [0, 70, 176] },
-    { label: 'vZEV-Eigenverbrauch',     val: p.vzev.toFixed(1),   unit: `kWh (${eigenPct}%)`, color: [58, 170, 106] },
-    { label: 'Netzbezug (abgerechnet)', val: p.g.toFixed(1),      unit: 'kWh',         color: [230, 144, 10] }
+    { label: 'Gesamtverbrauch',         val: p.cons.toFixed(1), unit: 'kWh',                 color: [0, 70, 176] },
+    { label: 'vZEV-Eigenverbrauch',     val: p.v.toFixed(1),    unit: `kWh (${eigenPct}%)`,  color: [58, 170, 106] },
+    { label: 'Netzbezug (abgerechnet)', val: p.g.toFixed(1),    unit: 'kWh',                 color: [230, 144, 10] }
   ];
 
   const boxW = (W - 4) / 3;
@@ -199,10 +204,10 @@ function drawInvoicePage(doc, p) {
     tableWidth: W,
     head: [['Position', 'Menge', 'Tarif', 'Betrag CHF']],
     body: [
-      ['Netzenergie (Energiepreis)',  `${p.g.toFixed(1)} kWh`,  `${(p.tariff.ep * 100).toFixed(2)} Rp/kWh`,  fmtCHF(p.ec)],
-      ['Netznutzung (Arbeit)',        `${p.g.toFixed(1)} kWh`,  `${(p.tariff.np * 100).toFixed(2)} Rp/kWh`,  fmtCHF(p.nc)],
-      ['KEV / Bundesabgaben',         `${p.g.toFixed(1)} kWh`,  `${(p.tariff.lp * 100).toFixed(2)} Rp/kWh`,  fmtCHF(p.lc)],
-      ['Grundgebühr',                 `${p.mc} Mt.`,             `${p.tariff.bp.toFixed(2)} CHF/Mt.`,          fmtCHF(p.bc)]
+      ['Energiebezug BKW (all-in)',  `${p.g.toFixed(1)} kWh`, `${(p.tariff.energyAllIn * 100).toFixed(2)} Rp/kWh`, fmtCHF(p.eb)],
+      ['vZEV-Eigenverbrauch Solar',  `${p.v.toFixed(1)} kWh`, `${(p.tariff.vzevPrice   * 100).toFixed(2)} Rp/kWh`, fmtCHF(p.vz)],
+      ['Grundtarif BKW',             `${p.mc} Mt.`,            `${p.tariff.grundtarif.toFixed(2)} CHF/Mt.`,          fmtCHF(p.mc * p.tariff.grundtarif)],
+      ['PVshare Abo',                `${p.mc} Mt.`,            `${p.tariff.pvshareAbo.toFixed(2)} CHF/Mt.`,          fmtCHF(p.mc * p.tariff.pvshareAbo)]
     ],
     foot: [['TOTAL NETTO', '', '', fmtCHF(p.total) + ' CHF']],
     headStyles: {
@@ -253,8 +258,8 @@ function drawInvoicePage(doc, p) {
   doc.setTextColor(61, 79, 107);
   const note =
     `Der Netzbezug basiert auf der 15-Minuten-Messung des Smartmeters. ` +
-    `Der vZEV-Eigenverbrauch (${p.vzev.toFixed(1)} kWh, ${eigenPct}% des Gesamtverbrauchs) ist bereits abgezogen – ` +
-    `nur der verbleibende Netzbezug (${p.g.toFixed(1)} kWh) wird verrechnet. ` +
+    `Der vZEV-Eigenverbrauch (${p.v.toFixed(1)} kWh, ${eigenPct}% des Gesamtverbrauchs) ist bereits abgezogen – ` +
+    `nur der verbleibende Netzbezug (${p.g.toFixed(1)} kWh) wird zum BKW-Tarif verrechnet. ` +
     `Eigenverbrauchsquote vZEV (gesamt): ${p.scRate.toFixed(1)}% · Eigendeckungsgrad: ${p.ssRate.toFixed(1)}%.`;
   const noteLines = doc.splitTextToSize(note, W - 9);
   doc.text(noteLines, ML + 5, y + 9.5);

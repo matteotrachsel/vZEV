@@ -13,35 +13,56 @@ function renderSummary(tot, scRate, ssRate) {
 
 function renderMonthly(monthly, tariff, nV) {
   const months = Object.keys(monthly).sort();
+  const ep = `${(tariff.energyAllIn * 100).toFixed(2)} Rp`;
+  const vp = `${(tariff.vzevPrice   * 100).toFixed(2)} Rp`;
   document.querySelector('#monthlyTable thead').innerHTML = `<tr>
-    <th>Monat</th><th class="tr">Verbrauch kWh</th><th class="tr">Produktion kWh</th>
-    <th class="tr">vZEV-Anteil kWh</th><th class="tr">Netzbezug kWh</th>
-    <th class="tr">Eigendeckung</th><th class="tr">Einspeisung kWh</th>
-    <th class="tr">Grundgeb. CHF</th><th class="tr">Energiekost. CHF</th>
+    <th>Monat</th>
+    <th class="tr">Verbrauch kWh</th>
+    <th class="tr">Produktion kWh</th>
+    <th class="tr">vZEV-Anteil kWh</th>
+    <th class="tr">Netzbezug kWh</th>
+    <th class="tr">Eigendeckung</th>
+    <th class="tr">Einspeisung kWh</th>
+    <th class="tr">Energiebezug (${ep})</th>
+    <th class="tr">vZEV-Solar (${vp})</th>
+    <th class="tr">Grundgebühren</th>
+    <th class="tr">Einspeiseverg.</th>
     <th class="tr">Total CHF</th></tr>`;
 
-  let sC = 0, sP = 0, sV = 0, sG = 0, sF = 0, sB = 0, sE = 0, sT = 0;
+  let sC=0, sP=0, sV=0, sG=0, sF=0, sEB=0, sVZ=0, sFee=0, sFI=0, sT=0;
   const rows = months.map(mk => {
-    const d     = monthly[mk];
+    const d    = monthly[mk];
     const eigen = d.cons > 0 ? (d.vzev / d.cons) * 100 : 0;
-    const base  = nV * tariff.bp;
-    const ec    = d.grid * tariff.work;
-    const fi    = d.fi * tariff.fp;
-    const total = base + ec - fi;
-    sC += d.cons; sP += d.prod; sV += d.vzev; sG += d.grid;
-    sF += d.fi;   sB += base;   sE += ec;      sT += total;
+    const eb   = d.grid * tariff.energyAllIn;           // Energiebezug cost
+    const vz   = d.vzev * tariff.vzevPrice;             // vZEV solar cost
+    const fee  = nV * (tariff.grundtarif + tariff.pvshareAbo); // monthly fees (all meters)
+    const fi   = d.fi * tariff.feedIn;                  // feed-in revenue
+    const total = eb + vz + fee - fi;
+    sC+=d.cons; sP+=d.prod; sV+=d.vzev; sG+=d.grid;
+    sF+=d.fi; sEB+=eb; sVZ+=vz; sFee+=fee; sFI+=fi; sT+=total;
     return `<tr><td><strong>${fmtMonth(mk)}</strong></td>
-      <td class="tr">${d.cons.toFixed(1)}</td><td class="tr tg">${d.prod.toFixed(1)}</td>
-      <td class="tr">${d.vzev.toFixed(1)}</td><td class="tr">${d.grid.toFixed(1)}</td>
-      <td class="tr">${eigen.toFixed(1)}%</td><td class="tr">${d.fi.toFixed(1)}</td>
-      <td class="tr">${fmtCHF(base)}</td><td class="tr">${fmtCHF(ec)}</td>
+      <td class="tr">${d.cons.toFixed(1)}</td>
+      <td class="tr tg">${d.prod.toFixed(1)}</td>
+      <td class="tr">${d.vzev.toFixed(1)}</td>
+      <td class="tr">${d.grid.toFixed(1)}</td>
+      <td class="tr">${eigen.toFixed(1)}%</td>
+      <td class="tr">${d.fi.toFixed(1)}</td>
+      <td class="tr">${fmtCHF(eb)}</td>
+      <td class="tr tg">${fmtCHF(vz)}</td>
+      <td class="tr">${fmtCHF(fee)}</td>
+      <td class="tr" style="color:var(--green)">–${fmtCHF(fi)}</td>
       <td class="tr tc">${fmtCHF(total)}</td></tr>`;
   });
   rows.push(`<tr class="tfoot">
-    <td>Total</td><td class="tr">${sC.toFixed(1)}</td><td class="tr tg">${sP.toFixed(1)}</td>
+    <td>Total</td>
+    <td class="tr">${sC.toFixed(1)}</td><td class="tr tg">${sP.toFixed(1)}</td>
     <td class="tr">${sV.toFixed(1)}</td><td class="tr">${sG.toFixed(1)}</td>
-    <td class="tr">${sC > 0 ? (sV / sC * 100).toFixed(1) : 0}%</td><td class="tr">${sF.toFixed(1)}</td>
-    <td class="tr">${fmtCHF(sB)}</td><td class="tr">${fmtCHF(sE)}</td>
+    <td class="tr">${sC > 0 ? (sV/sC*100).toFixed(1) : 0}%</td>
+    <td class="tr">${sF.toFixed(1)}</td>
+    <td class="tr">${fmtCHF(sEB)}</td>
+    <td class="tr">${fmtCHF(sVZ)}</td>
+    <td class="tr">${fmtCHF(sFee)}</td>
+    <td class="tr" style="color:var(--green)">–${fmtCHF(sFI)}</td>
     <td class="tr tc">${fmtCHF(sT)}</td></tr>`);
   document.querySelector('#monthlyTable tbody').innerHTML = rows.join('');
 }
@@ -92,51 +113,60 @@ function renderMeterAgg(agg, meters, distStats, hasPriority) {
 }
 
 function renderCosts(agg, meters, tariff) {
-  const mc      = getMonthCount();
-  const cM      = meters.filter(m => m.typ === 'Verbrauch');
-  const totalBase = mc * tariff.bp;
+  const mc = getMonthCount();
+  const cM = meters.filter(m => m.typ === 'Verbrauch');
+  const ep = `${(tariff.energyAllIn * 100).toFixed(2)} Rp`;
+  const vp = `${(tariff.vzevPrice   * 100).toFixed(2)} Rp`;
 
   document.querySelector('#costTable thead').innerHTML = `<tr>
     <th>Zähler / Adresse</th>
     <th class="tr">Netzbezug kWh</th>
-    <th class="tr">Energie (${(tariff.ep * 100).toFixed(2)} Rp)</th>
-    <th class="tr">Netznutzg. (${(tariff.np * 100).toFixed(2)} Rp)</th>
-    <th class="tr">KEV (${(tariff.lp * 100).toFixed(2)} Rp)</th>
-    <th class="tr">Grundgeb. CHF</th>
+    <th class="tr">vZEV kWh</th>
+    <th class="tr">Energiebezug (${ep})</th>
+    <th class="tr">vZEV-Solar (${vp})</th>
+    <th class="tr">Grundgebühren CHF</th>
     <th class="tr">Total CHF</th></tr>`;
 
-  // Pre-compute grid totals for proportional base-fee split.
+  // Pre-compute totals for proportional fee split.
   const meterGrid = cM.map(m => {
     let g = 0;
     Object.values(agg[m.messpunktNr] || {}).forEach(d => { g += d.grid; });
     return g;
   });
+  const meterVzev = cM.map(m => {
+    let v = 0;
+    Object.values(agg[m.messpunktNr] || {}).forEach(d => { v += d.vzev; });
+    return v;
+  });
   const totalGrid = meterGrid.reduce((s, g) => s + g, 0);
+  const totalFee  = mc * (tariff.grundtarif + tariff.pvshareAbo);
 
-  let aG = 0, aT = 0;
+  let aG = 0, aV = 0, aT = 0;
   const rows = cM.map((m, i) => {
-    const g     = meterGrid[i];
-    const ec    = g * tariff.ep;
-    const nc    = g * tariff.np;
-    const lc    = g * tariff.lp;
-    const bc    = tariff.splitBase
-      ? (totalGrid > 0 ? (g / totalGrid) * totalBase : totalBase / cM.length)
-      : mc * tariff.bp;
-    const total = ec + nc + lc + bc;
-    aG += g; aT += total;
+    const g   = meterGrid[i];
+    const v   = meterVzev[i];
+    const eb  = g * tariff.energyAllIn;
+    const vz  = v * tariff.vzevPrice;
+    const fee = tariff.splitBase
+      ? (totalGrid > 0 ? (g / totalGrid) * cM.length * totalFee : totalFee)
+      : totalFee;
+    const total = eb + vz + fee;
+    aG += g; aV += v; aT += total;
     return `<tr>
       <td><div style="font-weight:700;color:var(--text)">${m.label || m.messpunktNr}</div>
           ${m.adresse   ? `<div style="font-size:.72rem;color:var(--text-muted)">${m.adresse}</div>` : ''}
           ${m.zaehlerNr ? `<div style="font-size:.65rem;color:var(--text-faint)">Zähler ${m.zaehlerNr}</div>` : ''}</td>
       <td class="tr">${g.toFixed(1)}</td>
-      <td class="tr">${fmtCHF(ec)}</td>
-      <td class="tr">${fmtCHF(nc)}</td>
-      <td class="tr">${fmtCHF(lc)}</td>
-      <td class="tr">${fmtCHF(bc)}</td>
+      <td class="tr tg">${v.toFixed(1)}</td>
+      <td class="tr">${fmtCHF(eb)}</td>
+      <td class="tr tg">${fmtCHF(vz)}</td>
+      <td class="tr">${fmtCHF(fee)}</td>
       <td class="tr tc">${fmtCHF(total)}</td></tr>`;
   });
-  rows.push(`<tr class="tfoot"><td>Total</td><td class="tr">${aG.toFixed(1)}</td>
-    <td class="tr">–</td><td class="tr">–</td><td class="tr">–</td><td class="tr">–</td>
+  rows.push(`<tr class="tfoot"><td>Total</td>
+    <td class="tr">${aG.toFixed(1)}</td>
+    <td class="tr">${aV.toFixed(1)}</td>
+    <td class="tr">–</td><td class="tr">–</td><td class="tr">–</td>
     <td class="tr tc">${fmtCHF(aT)}</td></tr>`);
   document.querySelector('#costTable tbody').innerHTML = rows.join('');
 }
