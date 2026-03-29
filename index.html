@@ -409,6 +409,27 @@ main {
   padding-top: .65rem;
   line-height: 1.7;
 }
+.prio-toggle {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  margin-top: .65rem;
+  padding: .55rem .75rem;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  transition: var(--transition);
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--text-mid);
+  user-select: none;
+  width: 100%;
+}
+.prio-toggle.active { border-color: #E6900A; background: #FFFBF2; color: #8A4F00; }
+.prio-toggle input[type=checkbox] { accent-color: #E6900A; width: 14px; height: 14px; cursor: pointer; flex-shrink: 0; }
+.badge-priority { background: #FEF3DC; color: #8A4F00; }
+.meter-cfg-card.is-priority { border-color: #E6900A; }
 
 /* ── SUMMARY TILES ──────────────────────────────────────────────────────── */
 .sum-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 1px; margin-bottom: 1.5rem; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
@@ -760,9 +781,11 @@ footer strong { color: rgba(255,255,255,.7); font-weight: 700; }
     <!-- Overview -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.75rem">
       <div>
-        <div class="card-head" style="border:none;padding:0;margin-bottom:.75rem">Grundprinzip – proportionale Verteilung</div>
+        <div class="card-head" style="border:none;padding:0;margin-bottom:.75rem">Verteilungsmethode</div>
         <p style="font-size:.83rem;color:var(--text-mid);font-weight:500;line-height:1.7">
-          Der Solarstrom wird <strong>nicht fix 50/50 aufgeteilt</strong>, sondern in jedem <strong>15-Minuten-Intervall</strong> proportional zum tatsächlichen Verbrauch jedes Teilnehmers. Verbraucht Ogimatte 10 in einem Intervall z.B. 75% des Gesamtverbrauchs, erhält sie auch 75% des verfügbaren Solarstroms – und umgekehrt. Die Verteilung schwankt damit laufend zwischen 0% und 100%.
+          Es gibt zwei Modi, wählbar pro Messpunkt in Schritt 2:<br><br>
+          <strong>Proportional (Standard):</strong> Der Solarstrom wird in jedem 15-Minuten-Intervall proportional zum Verbrauch aufgeteilt. Wer gerade mehr verbraucht, bekommt mehr Solar. Die Aufteilung ist <em>nicht fix</em> und schwankt laufend.<br><br>
+          <strong>☀ PV-Priorität:</strong> Der PV-Eigentümer verbraucht den Solarstrom zuerst bis zu seinem eigenen Bedarf. Nur der Überschuss wird anteilig an die anderen Teilnehmer verteilt. Erst wenn auch der Überschuss grösser ist als der Gesamtverbrauch aller, fliesst Strom ins Netz zurück.
         </p>
       </div>
       <div>
@@ -815,10 +838,14 @@ footer strong { color: rgba(255,255,255,.7); font-weight: 700; }
 
       <div style="background:var(--surface);padding:1.1rem 1.25rem">
         <div style="font-size:.68rem;font-weight:800;color:var(--blue);letter-spacing:.07em;text-transform:uppercase;margin-bottom:.5rem">⑤ Anteil je Zähler</div>
-        <div style="font-family:monospace;font-size:.85rem;color:var(--text);background:var(--bg);padding:.6rem .75rem;border-radius:var(--radius);margin-bottom:.5rem;line-height:1.8">
-          V<sub style="font-size:.7rem">i</sub>(t) = Cᵢ(t) / ΣC(t) × SC(t)
+        <div style="font-family:monospace;font-size:.82rem;color:var(--text);background:var(--bg);padding:.6rem .75rem;border-radius:var(--radius);margin-bottom:.5rem;line-height:2">
+          <span style="color:#8A4F00;font-weight:700">Priorität:</span><br>
+          V<sub style="font-size:.7rem">prio</sub> = min(P(t), C<sub style="font-size:.7rem">prio</sub>)<br>
+          P<sub style="font-size:.7rem">rest</sub> = max(0, P(t) − C<sub style="font-size:.7rem">prio</sub>)<br>
+          <span style="color:var(--blue);font-weight:700">Normal:</span><br>
+          Vᵢ(t) = Cᵢ / ΣC<sub style="font-size:.7rem">norm</sub> × min(P<sub style="font-size:.7rem">rest</sub>, ΣC<sub style="font-size:.7rem">norm</sub>)
         </div>
-        <p style="font-size:.75rem;color:var(--text-muted);font-weight:500">Proportionale Zuteilung: wer mehr verbraucht hat, erhält einen grösseren Solar-Anteil.</p>
+        <p style="font-size:.75rem;color:var(--text-muted);font-weight:500">PV-Eigentümer bekommt zuerst, Überschuss geht proportional an die anderen.</p>
       </div>
 
       <div style="background:var(--surface);padding:1.1rem 1.25rem">
@@ -972,9 +999,9 @@ footer strong { color: rgba(255,255,255,.7); font-weight: 700; }
 <script>
 // ── KNOWN METERS ───────────────────────────────────────────────────────────
 const KNOWN = [
-  { messpunktNr:'CH1022201234500000000000000092766', zaehlerNr:'10781966', typ:'Verbrauch',  label:'Ogimatte 10',          adresse:'Ogimatte 10, 3713 Reichenbach im Kandertal' },
-  { messpunktNr:'CH1022201234500000000000000524698', zaehlerNr:'10754964', typ:'Verbrauch',  label:'Ogimatte 7 (Verbrauch)',adresse:'Ogimatte 7, 3713 Reichenbach im Kandertal' },
-  { messpunktNr:'CH1022201234500000000000000524699', zaehlerNr:'10754964', typ:'Produktion', label:'Ogimatte 7 (Solar)',    adresse:'Ogimatte 7, 3713 Reichenbach im Kandertal' }
+  { messpunktNr:'CH1022201234500000000000000092766', zaehlerNr:'10781966', typ:'Verbrauch',  priority:false, label:'Ogimatte 10',          adresse:'Ogimatte 10, 3713 Reichenbach im Kandertal' },
+  { messpunktNr:'CH1022201234500000000000000524698', zaehlerNr:'10754964', typ:'Verbrauch',  priority:true,  label:'Ogimatte 7 (Verbrauch)',adresse:'Ogimatte 7, 3713 Reichenbach im Kandertal' },
+  { messpunktNr:'CH1022201234500000000000000524699', zaehlerNr:'10754964', typ:'Produktion', priority:false, label:'Ogimatte 7 (Solar)',    adresse:'Ogimatte 7, 3713 Reichenbach im Kandertal' }
 ];
 
 let parsedData = [];
@@ -1088,6 +1115,7 @@ function buildMeterConfig() {
   grid.innerHTML = detectedMPs.map((mp, i) => {
     const known = KNOWN.find(k => k.messpunktNr===mp || mp.includes(k.messpunktNr) || k.messpunktNr.includes(mp));
     const typ = known?.typ || 'Verbrauch';
+    const isPrio = known?.priority || false;
     const label = known?.label || '';
     const adresse = known?.adresse || '';
     const zaehlerNr = known?.zaehlerNr || '';
@@ -1097,15 +1125,15 @@ function buildMeterConfig() {
     const dMin = new Date(Math.min(...mData.map(r=>r.datum.getTime())));
     const dMax = new Date(Math.max(...mData.map(r=>r.datum.getTime())));
     return `
-    <div class="meter-cfg-card">
+    <div class="meter-cfg-card${isPrio?' is-priority':''}" id="card_${i}">
       ${known ? '<span class="found-badge">✓ Bekannt</span>' : ''}
       <div class="mpid">${mp}</div>
       <div class="cfg-row">
         <div style="flex:0 0 130px">
           <label>Typ</label>
           <div class="type-sel">
-            <select id="typ_${i}" onchange="updateTypeStyle(this)">
-              <option value="Verbrauch" ${typ==='Verbrauch'?'selected':''}>↓ Verbrauch</option>
+            <select id="typ_${i}" onchange="updateTypeStyle(this,${i})">
+              <option value="Verbrauch"  ${typ==='Verbrauch' ?'selected':''}>↓ Verbrauch</option>
               <option value="Produktion" ${typ==='Produktion'?'selected':''}>☀ Produktion</option>
               <option value="ignore">— Ignorieren</option>
             </select>
@@ -1126,6 +1154,12 @@ function buildMeterConfig() {
           <input type="text" id="zaehler_${i}" value="${zaehlerNr}" placeholder="z. B. 10781966">
         </div>
       </div>
+      <div id="priorow_${i}" style="${typ!=='Verbrauch'?'display:none':''}">
+        <label onclick="togglePrio(${i})" class="prio-toggle${isPrio?' active':''}" id="priolabel_${i}">
+          <input type="checkbox" id="prio_${i}" ${isPrio?'checked':''} onclick="event.stopPropagation();togglePrio(${i})">
+          ☀ PV-Priorität: Solarstrom wird zuerst diesem Zähler zugeteilt
+        </label>
+      </div>
       <div class="meter-stats">
         ${mData.length.toLocaleString('de-CH')} Messwerte &nbsp;·&nbsp; ${fmt(dMin)} – ${fmt(dMax)}
         ${totalB>0 ? `&nbsp;·&nbsp; Bezug: <strong>${totalB.toFixed(1)} kWh</strong>` : ''}
@@ -1134,20 +1168,35 @@ function buildMeterConfig() {
     </div>`;
   }).join('');
 
-  detectedMPs.forEach((_,i) => { const s = document.getElementById('typ_'+i); if(s) updateTypeStyle(s); });
+  detectedMPs.forEach((_,i) => { const s = document.getElementById('typ_'+i); if(s) updateTypeStyle(s,i); });
   card.classList.remove('hidden');
   card.scrollIntoView({ behavior:'smooth', block:'start' });
 }
 
-function updateTypeStyle(sel) { sel.className = sel.value.toLowerCase(); }
+function updateTypeStyle(sel, idx) {
+  sel.className = sel.value.toLowerCase();
+  const prioRow = document.getElementById('priorow_'+idx);
+  if (prioRow) prioRow.style.display = sel.value === 'Verbrauch' ? '' : 'none';
+}
+
+function togglePrio(i) {
+  const cb = document.getElementById('prio_'+i);
+  cb.checked = !cb.checked;
+  const label = document.getElementById('priolabel_'+i);
+  const card  = document.getElementById('card_'+i);
+  if (cb.checked) { label.classList.add('active'); card.classList.add('is-priority'); }
+  else            { label.classList.remove('active'); card.classList.remove('is-priority'); }
+}
 
 function getMeterConfig() {
   return detectedMPs.map((mp, i) => ({
     messpunktNr: mp,
-    typ: document.getElementById('typ_'+i)?.value || 'Verbrauch',
-    label: document.getElementById('label_'+i)?.value.trim() || mp.slice(-8),
-    adresse: document.getElementById('adresse_'+i)?.value.trim() || '',
-    zaehlerNr: document.getElementById('zaehler_'+i)?.value.trim() || ''
+    typ:      document.getElementById('typ_'+i)?.value || 'Verbrauch',
+    priority: document.getElementById('typ_'+i)?.value === 'Verbrauch' &&
+              (document.getElementById('prio_'+i)?.checked || false),
+    label:    document.getElementById('label_'+i)?.value.trim() || mp.slice(-8),
+    adresse:  document.getElementById('adresse_'+i)?.value.trim() || '',
+    zaehlerNr:document.getElementById('zaehler_'+i)?.value.trim() || ''
   })).filter(m => m.typ !== 'ignore');
 }
 
@@ -1164,10 +1213,13 @@ function getTariff() {
 function calculateAndRender() {
   const meters = getMeterConfig();
   const tariff = getTariff();
-  const prodMeters = meters.filter(m => m.typ==='Produktion');
-  const consMeters = meters.filter(m => m.typ==='Verbrauch');
+  const prodMeters  = meters.filter(m => m.typ==='Produktion');
+  const prioMeters  = meters.filter(m => m.typ==='Verbrauch' && m.priority);
+  const normMeters  = meters.filter(m => m.typ==='Verbrauch' && !m.priority);
+  const consMeters  = meters.filter(m => m.typ==='Verbrauch'); // all consumers
   if (!consMeters.length) { alert('Mindestens einen Verbrauch-Messpunkt konfigurieren.'); return; }
   if (!prodMeters.length)  { alert('Mindestens einen Produktions-Messpunkt konfigurieren.'); return; }
+  const hasPriority = prioMeters.length > 0;
 
   const byTS = {};
   parsedData.forEach(r => {
@@ -1180,7 +1232,6 @@ function calculateAndRender() {
   const agg = {};
   meters.forEach(m => { agg[m.messpunktNr] = {}; });
   const monthly = {};
-  // Per-consumer distribution stats: collect share% for intervals where SC>0
   const distStats = {};
   consMeters.forEach(m => { distStats[m.messpunktNr] = []; });
 
@@ -1188,19 +1239,40 @@ function calculateAndRender() {
     const d = new Date(parseInt(ts));
     const mk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     const prod = prodMeters.reduce((s,m) => { const sl=slots[m.messpunktNr]; return s+(sl?Math.max(sl.bezug,sl.einspeisung):0); },0);
-    const cons = consMeters.map(m => ({ m, c: slots[m.messpunktNr]?.bezug||0 }));
-    const totalC = cons.reduce((s,x)=>s+x.c,0);
-    const sc = Math.min(prod, totalC);
-    const fi = Math.max(0, prod-totalC);
-    cons.forEach(({m,c}) => {
-      const vzev = totalC>0 ? (c/totalC)*sc : 0;
+
+    // ── Priority distribution ──────────────────────────────────────────────
+    // Step 1: priority meters consume solar first (proportional among themselves)
+    const prioCons = prioMeters.map(m => ({ m, c: slots[m.messpunktNr]?.bezug||0 }));
+    const totalPrio = prioCons.reduce((s,x)=>s+x.c, 0);
+    const scPrio = Math.min(prod, totalPrio);
+    prioCons.forEach(({m,c}) => {
+      const vzev = totalPrio>0 ? (c/totalPrio)*scPrio : 0;
       if (!agg[m.messpunktNr][mk]) agg[m.messpunktNr][mk] = {cons:0,vzev:0,grid:0,prod:0};
       agg[m.messpunktNr][mk].cons += c;
       agg[m.messpunktNr][mk].vzev += vzev;
       agg[m.messpunktNr][mk].grid += c-vzev;
-      // Track distribution share for intervals where solar is self-consumed
-      if (sc > 0 && totalC > 0) distStats[m.messpunktNr].push((c/totalC)*100);
+      if (scPrio>0 && totalPrio>0) distStats[m.messpunktNr].push((c/totalPrio)*100);
     });
+
+    // Step 2: surplus solar distributed proportionally to normal meters
+    const prodLeft = Math.max(0, prod - scPrio);
+    const normCons = normMeters.map(m => ({ m, c: slots[m.messpunktNr]?.bezug||0 }));
+    const totalNorm = normCons.reduce((s,x)=>s+x.c, 0);
+    const scNorm = Math.min(prodLeft, totalNorm);
+    normCons.forEach(({m,c}) => {
+      const vzev = totalNorm>0 ? (c/totalNorm)*scNorm : 0;
+      if (!agg[m.messpunktNr][mk]) agg[m.messpunktNr][mk] = {cons:0,vzev:0,grid:0,prod:0};
+      agg[m.messpunktNr][mk].cons += c;
+      agg[m.messpunktNr][mk].vzev += vzev;
+      agg[m.messpunktNr][mk].grid += c-vzev;
+      if (scNorm>0 && totalNorm>0) distStats[m.messpunktNr].push((c/totalNorm)*100);
+    });
+    // ──────────────────────────────────────────────────────────────────────
+
+    const totalC = totalPrio + totalNorm;
+    const sc = scPrio + scNorm;
+    const fi = Math.max(0, prod - totalC);
+
     prodMeters.forEach(pm => {
       const sl=slots[pm.messpunktNr]; const pmP=sl?Math.max(sl.bezug,sl.einspeisung):0;
       if (!agg[pm.messpunktNr][mk]) agg[pm.messpunktNr][mk] = {cons:0,vzev:0,grid:0,prod:0};
@@ -1222,7 +1294,7 @@ function calculateAndRender() {
 
   renderSummary(tot, scRate, ssRate);
   renderMonthly(monthly, tariff, consMeters.length);
-  renderMeterAgg(agg, meters, distStats);
+  renderMeterAgg(agg, meters, distStats, hasPriority);
   renderCosts(agg, meters, tariff);
   renderCharts(monthly, consMeters, agg);
   renderMethodologyExample(byTS, consMeters, prodMeters);
@@ -1277,7 +1349,7 @@ function renderMonthly(monthly, tariff, nV) {
     <td class="tr tc">${fmtCHF(sT)}</td></tr>`;
 }
 
-function renderMeterAgg(agg, meters, distStats) {
+function renderMeterAgg(agg, meters, distStats, hasPriority) {
   document.querySelector('#meterTable thead').innerHTML=`<tr>
     <th>Bezeichnung</th><th>Messpunkt</th><th>Typ</th>
     <th class="tr">Verbrauch kWh</th><th class="tr">Produktion kWh</th>
@@ -1289,7 +1361,14 @@ function renderMeterAgg(agg, meters, distStats) {
     let c=0,v=0,g=0,p=0;
     Object.values(agg[m.messpunktNr]||{}).forEach(d=>{c+=d.cons;v+=d.vzev;g+=d.grid;p+=d.prod;});
     const isP=m.typ==='Produktion';
-    const typeTag=`<span style="font-size:.68rem;font-weight:700;padding:.18rem .5rem;border-radius:2px;${isP?'background:var(--green-light);color:var(--green)':'background:var(--blue-light);color:var(--blue)'}">${m.typ}</span>`;
+    const isPrio = m.priority && !isP;
+    const typeStyle = isP
+      ? 'background:var(--green-light);color:var(--green)'
+      : isPrio
+        ? 'background:#FEF3DC;color:#8A4F00'
+        : 'background:var(--blue-light);color:var(--blue)';
+    const typeLabel = isP ? 'Produktion' : isPrio ? '☀ Priorität' : 'Verbrauch';
+    const typeTag=`<span style="font-size:.68rem;font-weight:700;padding:.18rem .5rem;border-radius:2px;${typeStyle}">${typeLabel}</span>`;
     // Distribution stats
     let avgShare='–', rangeStr='–';
     if (!isP && distStats?.[m.messpunktNr]?.length) {
