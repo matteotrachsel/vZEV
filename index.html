@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>vZEV Stromauswertung | BKW</title>
+<title>vZEV Stromauswertung – Ogimatte Reichenbach</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -597,18 +597,18 @@ footer strong { color: rgba(255,255,255,.7); font-weight: 700; }
         <path d="M13 25L17 18L21 25H13Z" fill="#0046B0"/>
       </svg>
     </div>
-    <span class="nav-logo-text">BKW</span>
+    <span class="nav-logo-text">vZEV</span>
   </a>
   <div class="nav-divider"></div>
-  <span class="nav-title">Kundenportal · vZEV Stromauswertung</span>
-  <span class="nav-badge">Energy Blue</span>
+  <span class="nav-title">Zusammenschluss zum Eigenverbrauch · Stromauswertung</span>
+  <span class="nav-badge">Ogimatte Reichenbach</span>
 </nav>
 
 <!-- ── PAGE HEADER ───────────────────────────────────────────────────────── -->
 <div class="page-header">
   <div class="page-header-inner">
     <div class="breadcrumb">
-      <a href="#">Mein BKW</a>
+      <a href="#">Startseite</a>
       <span>›</span>
       <a href="#">Zusammenschluss zum Eigenverbrauch</a>
       <span>›</span>
@@ -646,14 +646,14 @@ footer strong { color: rgba(255,255,255,.7); font-weight: 700; }
     <span class="section-num">Schritt 1</span>
     <div>
       <div class="section-title">Messdaten hochladen</div>
-      <div class="section-desc">BKW-Exportdatei mit 15-Minuten-Intervalldaten (XLSX)</div>
+      <div class="section-desc">Exportdatei mit 15-Minuten-Intervalldaten (XLSX)</div>
     </div>
   </div>
 
   <div class="card">
     <div class="alert ai" style="margin-bottom:1.25rem">
       <span class="alert-icon">ℹ</span>
-      <span>Laden Sie die Excel-Exportdatei von BKW hoch. Erwartete Spalten: <strong>Messpunkt</strong>, <strong>Datum</strong>, <strong>Strombezug [kWh]</strong>, <strong>Stromeinspeisung [kWh]</strong>. Eine Datei kann mehrere Messpunkte enthalten.</span>
+      <span>Laden Sie die Exportdatei Ihres Netzbetreibers hoch. Erwartete Spalten: <strong>Messpunkt</strong>, <strong>Datum</strong>, <strong>Strombezug [kWh]</strong>, <strong>Stromeinspeisung [kWh]</strong>. Eine Datei kann mehrere Messpunkte enthalten.</span>
     </div>
 
     <div class="upload-zone" id="uploadZone">
@@ -703,18 +703,18 @@ footer strong { color: rgba(255,255,255,.7); font-weight: 700; }
     <span class="section-num">Schritt 3</span>
     <div>
       <div class="section-title">Tarif-Konfiguration</div>
-      <div class="section-desc">Aktuelle BKW-Tarifdaten 2026 · bei Bedarf anpassbar</div>
+      <div class="section-desc">Aktuelle Tarifdaten 2026 · alle Werte anpassbar</div>
     </div>
   </div>
 
   <div class="card">
     <div class="tariff-tag">
       <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M6 3.5v2.5l1.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-      BKW Energy Blue 2026 · Energiebezug &lt; 50 MWh/a · NE7
+      Energy Blue 2026 · Energiebezug &lt; 50 MWh/a · NE7
     </div>
     <div class="tariff-grid">
       <div class="tfield">
-        <label>Energiepreis Energy Blue</label>
+        <label>Energiepreis</label>
         <input type="number" id="energyPrice" value="10.02" step="0.01" min="0">
         <div class="suffix">Rp/kWh</div>
       </div>
@@ -740,12 +740,192 @@ footer strong { color: rgba(255,255,255,.7); font-weight: 700; }
       </div>
     </div>
     <p style="margin-top:1rem;font-size:.73rem;color:var(--text-muted);font-weight:500">
-      Energiepreis und Grundpreis aus BKW-Tarifdaten 2026 (tarife-json). Netznutzungstarif gemäss aktuellem BKW-Dokument prüfen und ggf. anpassen.
+      Energiepreis und Grundpreis aus den publizierten Tarifdaten 2026. Netznutzungstarif gemäss aktuellem Netznutzungsdokument prüfen und ggf. anpassen.
     </p>
   </div>
 </div>
 
-<!-- SECTION 4: Results -->
+<!-- SECTION 4: Methodology -->
+<div class="section">
+  <div class="section-head">
+    <span class="section-num" style="background:#F0F4F9;color:var(--text-mid)">Methodik</span>
+    <div>
+      <div class="section-title">Berechnungsmethode &amp; Transparenz</div>
+      <div class="section-desc">So wird der Solarstrom-Anteil jedes Messpunkts berechnet</div>
+    </div>
+  </div>
+
+  <div class="card">
+
+    <!-- Overview -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.75rem">
+      <div>
+        <div class="card-head" style="border:none;padding:0;margin-bottom:.75rem">Grundprinzip</div>
+        <p style="font-size:.83rem;color:var(--text-mid);font-weight:500;line-height:1.7">
+          Im vZEV wird die Solarproduktion in jedem <strong>15-Minuten-Intervall</strong> proportional auf alle Verbraucher aufgeteilt – je nach ihrem Anteil am Gesamtverbrauch in diesem Intervall. Was nicht selbst verbraucht wird, geht ins öffentliche Netz. Was nicht durch Solar gedeckt werden kann, wird vom Netz bezogen.
+        </p>
+      </div>
+      <div>
+        <div class="card-head" style="border:none;padding:0;margin-bottom:.75rem">Grundlage</div>
+        <p style="font-size:.83rem;color:var(--text-mid);font-weight:500;line-height:1.7">
+          Die Daten stammen aus den geeichten Smartmetern und werden vom Netzbetreiber im 15-Minuten-Raster erfasst. Jeder Verbrauch und jede Produktion wird <strong>physisch gemessen</strong>. Die Aufteilung erfolgt rein rechnerisch nach der unten beschriebenen Formel.
+        </p>
+      </div>
+    </div>
+
+    <!-- Step-by-step formula -->
+    <div class="card-head" style="margin-bottom:1rem">Schritt-für-Schritt Berechnung pro 15-Minuten-Intervall</div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;margin-bottom:1.75rem">
+
+      <div style="background:var(--surface);padding:1.1rem 1.25rem">
+        <div style="font-size:.68rem;font-weight:800;color:var(--blue);letter-spacing:.07em;text-transform:uppercase;margin-bottom:.5rem">① Messwerte lesen</div>
+        <div style="font-family:monospace;font-size:.85rem;color:var(--text);background:var(--bg);padding:.6rem .75rem;border-radius:var(--radius);margin-bottom:.5rem;line-height:1.8">
+          P(t) = Solarproduktion<br>
+          C₁(t) = Verbrauch Zähler 1<br>
+          C₂(t) = Verbrauch Zähler 2<br>
+          <span style="color:var(--text-muted)">…alle in kWh</span>
+        </div>
+        <p style="font-size:.75rem;color:var(--text-muted);font-weight:500">Alle Werte stammen direkt aus der hochgeladenen Messdatei.</p>
+      </div>
+
+      <div style="background:var(--surface);padding:1.1rem 1.25rem">
+        <div style="font-size:.68rem;font-weight:800;color:var(--blue);letter-spacing:.07em;text-transform:uppercase;margin-bottom:.5rem">② Gesamtverbrauch</div>
+        <div style="font-family:monospace;font-size:.85rem;color:var(--text);background:var(--bg);padding:.6rem .75rem;border-radius:var(--radius);margin-bottom:.5rem;line-height:1.8">
+          ΣC(t) = C₁(t) + C₂(t) + …
+        </div>
+        <p style="font-size:.75rem;color:var(--text-muted);font-weight:500">Summe des Verbrauchs aller Teilnehmer im selben Intervall.</p>
+      </div>
+
+      <div style="background:var(--surface);padding:1.1rem 1.25rem">
+        <div style="font-size:.68rem;font-weight:800;color:var(--green);letter-spacing:.07em;text-transform:uppercase;margin-bottom:.5rem">③ Selbstverbrauch (vZEV)</div>
+        <div style="font-family:monospace;font-size:.85rem;color:var(--text);background:var(--bg);padding:.6rem .75rem;border-radius:var(--radius);margin-bottom:.5rem;line-height:1.8">
+          SC(t) = min(P(t), ΣC(t))
+        </div>
+        <p style="font-size:.75rem;color:var(--text-muted);font-weight:500">Der tatsächlich selbst genutzte Teil der Produktion — maximal so viel wie verbraucht wird.</p>
+      </div>
+
+      <div style="background:var(--surface);padding:1.1rem 1.25rem">
+        <div style="font-size:.68rem;font-weight:800;color:var(--amber);letter-spacing:.07em;text-transform:uppercase;margin-bottom:.5rem">④ Netzeinspeisung</div>
+        <div style="font-family:monospace;font-size:.85rem;color:var(--text);background:var(--bg);padding:.6rem .75rem;border-radius:var(--radius);margin-bottom:.5rem;line-height:1.8">
+          FI(t) = max(0, P(t) − ΣC(t))
+        </div>
+        <p style="font-size:.75rem;color:var(--text-muted);font-weight:500">Überschuss-Strom, der nicht verbraucht wird und ins öffentliche Netz fliesst.</p>
+      </div>
+
+      <div style="background:var(--surface);padding:1.1rem 1.25rem">
+        <div style="font-size:.68rem;font-weight:800;color:var(--blue);letter-spacing:.07em;text-transform:uppercase;margin-bottom:.5rem">⑤ Anteil je Zähler</div>
+        <div style="font-family:monospace;font-size:.85rem;color:var(--text);background:var(--bg);padding:.6rem .75rem;border-radius:var(--radius);margin-bottom:.5rem;line-height:1.8">
+          V<sub style="font-size:.7rem">i</sub>(t) = Cᵢ(t) / ΣC(t) × SC(t)
+        </div>
+        <p style="font-size:.75rem;color:var(--text-muted);font-weight:500">Proportionale Zuteilung: wer mehr verbraucht hat, erhält einen grösseren Solar-Anteil.</p>
+      </div>
+
+      <div style="background:var(--surface);padding:1.1rem 1.25rem">
+        <div style="font-size:.68rem;font-weight:800;color:var(--text-mid);letter-spacing:.07em;text-transform:uppercase;margin-bottom:.5rem">⑥ Netzbezug je Zähler</div>
+        <div style="font-family:monospace;font-size:.85rem;color:var(--text);background:var(--bg);padding:.6rem .75rem;border-radius:var(--radius);margin-bottom:.5rem;line-height:1.8">
+          G<sub style="font-size:.7rem">i</sub>(t) = Cᵢ(t) − Vᵢ(t)
+        </div>
+        <p style="font-size:.75rem;color:var(--text-muted);font-weight:500">Dieser Wert ist die Basis für die Stromkosten-Abrechnung.</p>
+      </div>
+
+    </div>
+
+    <!-- Worked example -->
+    <div class="card-head" style="margin-bottom:1rem">Zahlenbeispiel (ein 15-Minuten-Intervall)</div>
+    <div style="overflow-x:auto;margin-bottom:1.75rem">
+      <table style="min-width:560px">
+        <thead>
+          <tr>
+            <th>Grösse</th>
+            <th class="tr">Zähler Ogimatte 10</th>
+            <th class="tr">Zähler Ogimatte 7</th>
+            <th class="tr">Solar (Prod.)</th>
+            <th class="tr">vZEV gesamt</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Verbrauch C(t)</td>
+            <td class="tr">0.300 kWh</td>
+            <td class="tr">0.200 kWh</td>
+            <td class="tr">–</td>
+            <td class="tr"><strong>0.500 kWh</strong></td>
+          </tr>
+          <tr>
+            <td>Produktion P(t)</td>
+            <td class="tr">–</td>
+            <td class="tr">–</td>
+            <td class="tr tg">0.360 kWh</td>
+            <td class="tr">–</td>
+          </tr>
+          <tr>
+            <td>Selbstverbrauch SC(t) = min(0.360, 0.500)</td>
+            <td class="tr">–</td>
+            <td class="tr">–</td>
+            <td class="tr">–</td>
+            <td class="tr tg"><strong>0.360 kWh</strong></td>
+          </tr>
+          <tr>
+            <td>Netzeinspeisung FI(t) = max(0, 0.360−0.500)</td>
+            <td class="tr">–</td>
+            <td class="tr">–</td>
+            <td class="tr">–</td>
+            <td class="tr" style="color:var(--amber)"><strong>0.000 kWh</strong></td>
+          </tr>
+          <tr>
+            <td>Solar-Anteil V(t) = C / 0.500 × 0.360</td>
+            <td class="tr tg">0.300/0.500 × 0.360 = <strong>0.216 kWh</strong></td>
+            <td class="tr tg">0.200/0.500 × 0.360 = <strong>0.144 kWh</strong></td>
+            <td class="tr">–</td>
+            <td class="tr tg"><strong>0.360 kWh</strong></td>
+          </tr>
+          <tr>
+            <td>Netzbezug G(t) = C − V</td>
+            <td class="tr">0.300 − 0.216 = <strong>0.084 kWh</strong></td>
+            <td class="tr">0.200 − 0.144 = <strong>0.056 kWh</strong></td>
+            <td class="tr">–</td>
+            <td class="tr"><strong>0.140 kWh</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Cost calculation -->
+    <div class="card-head" style="margin-bottom:1rem">Kostenberechnung (monatlich aggregiert)</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;margin-bottom:1.25rem">
+      <div style="background:var(--surface);padding:1rem 1.25rem">
+        <div style="font-size:.68rem;font-weight:800;color:var(--text-mid);letter-spacing:.07em;text-transform:uppercase;margin-bottom:.4rem">Energiekosten</div>
+        <div style="font-family:monospace;font-size:.82rem;color:var(--text);line-height:1.8">
+          Σ G(t) × (Energiepreis + Netznutzung + KEV)
+        </div>
+        <div style="font-size:.73rem;color:var(--text-muted);margin-top:.4rem">Summe aller Netzbezugs-Intervalle × Gesamttarif [Rp/kWh]</div>
+      </div>
+      <div style="background:var(--surface);padding:1rem 1.25rem">
+        <div style="font-size:.68rem;font-weight:800;color:var(--text-mid);letter-spacing:.07em;text-transform:uppercase;margin-bottom:.4rem">Grundgebühr</div>
+        <div style="font-family:monospace;font-size:.82rem;color:var(--text);line-height:1.8">
+          Anzahl Monate × Grundpreis [CHF/Mt.]
+        </div>
+        <div style="font-size:.73rem;color:var(--text-muted);margin-top:.4rem">Fixkosten pro Verbrauchszähler, unabhängig vom Verbrauch</div>
+      </div>
+      <div style="background:var(--surface);padding:1rem 1.25rem">
+        <div style="font-size:.68rem;font-weight:800;color:var(--text-mid);letter-spacing:.07em;text-transform:uppercase;margin-bottom:.4rem">Total</div>
+        <div style="font-family:monospace;font-size:.82rem;color:var(--text);line-height:1.8">
+          Energiekosten + Grundgebühr − Rückliefervergütung
+        </div>
+        <div style="font-size:.73rem;color:var(--text-muted);margin-top:.4rem">Rückliefervergütung = FI(t) × Rücklieferpreis (falls eingestellt)</div>
+      </div>
+    </div>
+
+    <div class="alert ai">
+      <span class="alert-icon">ℹ</span>
+      <span>Die Berechnung erfolgt vollständig im Browser – es werden keine Daten an einen Server übertragen. Der Quellcode ist öffentlich einsehbar auf <a href="https://github.com/matteotrachsel/vZEV" target="_blank" style="color:var(--blue);font-weight:700">github.com/matteotrachsel/vZEV</a>.</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- SECTION 5: Results -->
 <div id="results" class="hidden">
 
   <div class="section-head" style="margin-top:.5rem">
@@ -809,7 +989,7 @@ footer strong { color: rgba(255,255,255,.7); font-weight: 700; }
 </main>
 
 <footer>
-  <strong>BKW Energie AG</strong> · vZEV Stromauswertung · Energy Blue · Reichenbach im Kandertal
+  <strong>vZEV Ogimatte</strong> · Zusammenschluss zum Eigenverbrauch · Reichenbach im Kandertal
 </footer>
 
 <!-- ── SCRIPT ─────────────────────────────────────────────────────────────── -->
