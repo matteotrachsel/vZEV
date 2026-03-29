@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupStaticHandlers();
 
   // Auto-recalculate when tariff inputs change (only if data is loaded).
-  document.querySelectorAll('#energyPrice,#basePrice,#networkPrice,#levyPrice,#feedInPrice')
+  document.querySelectorAll('#feedInPrice,#pvshareAbo,#grundtarif,#energyAllIn,#vzevPrice')
     .forEach(el => el.addEventListener('change', () => {
       if (AppState.parsedData.length) calculateAndRender();
     }));
@@ -200,13 +200,13 @@ function getMeterConfig() {
 }
 
 function getTariff() {
-  const ep = parseFloat(document.getElementById('energyPrice').value) / 100;
-  const bp = parseFloat(document.getElementById('basePrice').value);
-  const np = parseFloat(document.getElementById('networkPrice').value) / 100;
-  const lp = parseFloat(document.getElementById('levyPrice').value) / 100;
-  const fp = parseFloat(document.getElementById('feedInPrice').value) / 100;
-  const splitBase = document.getElementById('splitBase_prop')?.checked || false;
-  return { ep, bp, np, lp, fp, work: ep + np + lp, splitBase };
+  const energyAllIn = parseFloat(document.getElementById('energyAllIn').value) / 100;  // CHF/kWh all-in
+  const vzevPrice   = parseFloat(document.getElementById('vzevPrice').value)   / 100;  // CHF/kWh internal solar
+  const grundtarif  = parseFloat(document.getElementById('grundtarif').value);          // CHF/month per meter
+  const pvshareAbo  = parseFloat(document.getElementById('pvshareAbo').value);          // CHF/month per meter
+  const feedIn      = parseFloat(document.getElementById('feedInPrice').value) / 100;  // CHF/kWh feed-in
+  const splitBase   = document.getElementById('splitBase_prop')?.checked || false;
+  return { energyAllIn, vzevPrice, grundtarif, pvshareAbo, feedIn, splitBase };
 }
 
 // ── BKW tariff fetch ──────────────────────────────────────────────────────────
