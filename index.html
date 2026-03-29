@@ -760,9 +760,9 @@ footer strong { color: rgba(255,255,255,.7); font-weight: 700; }
     <!-- Overview -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.75rem">
       <div>
-        <div class="card-head" style="border:none;padding:0;margin-bottom:.75rem">Grundprinzip</div>
+        <div class="card-head" style="border:none;padding:0;margin-bottom:.75rem">Grundprinzip – proportionale Verteilung</div>
         <p style="font-size:.83rem;color:var(--text-mid);font-weight:500;line-height:1.7">
-          Im vZEV wird die Solarproduktion in jedem <strong>15-Minuten-Intervall</strong> proportional auf alle Verbraucher aufgeteilt – je nach ihrem Anteil am Gesamtverbrauch in diesem Intervall. Was nicht selbst verbraucht wird, geht ins öffentliche Netz. Was nicht durch Solar gedeckt werden kann, wird vom Netz bezogen.
+          Der Solarstrom wird <strong>nicht fix 50/50 aufgeteilt</strong>, sondern in jedem <strong>15-Minuten-Intervall</strong> proportional zum tatsächlichen Verbrauch jedes Teilnehmers. Verbraucht Ogimatte 10 in einem Intervall z.B. 75% des Gesamtverbrauchs, erhält sie auch 75% des verfügbaren Solarstroms – und umgekehrt. Die Verteilung schwankt damit laufend zwischen 0% und 100%.
         </p>
       </div>
       <div>
@@ -925,6 +925,15 @@ footer strong { color: rgba(255,255,255,.7); font-weight: 700; }
         <canvas id="chartPie"></canvas>
       </div>
     </div>
+  </div>
+
+  <!-- Distribution chart -->
+  <div class="card" style="margin-bottom:1.5rem">
+    <div class="card-head">Solar-Zuteilung pro Monat · nicht fix 50/50</div>
+    <p style="font-size:.78rem;color:var(--text-muted);font-weight:500;margin-bottom:1rem">
+      Zeigt, wie viel Prozent des selbstverbrauchten Solarstroms in jedem Monat auf jeden Teilnehmer entfiel. Die Aufteilung variiert je nach tatsächlichem Verbrauchsverhalten – sie ist <strong>nicht fix</strong>, sondern wird für jedes der ~2'976 Intervalle pro Monat neu berechnet.
+    </p>
+    <canvas id="chartDist" style="max-height:220px"></canvas>
   </div>
 
   <!-- Monthly table -->
@@ -1171,6 +1180,9 @@ function calculateAndRender() {
   const agg = {};
   meters.forEach(m => { agg[m.messpunktNr] = {}; });
   const monthly = {};
+  // Per-consumer distribution stats: collect share% for intervals where SC>0
+  const distStats = {};
+  consMeters.forEach(m => { distStats[m.messpunktNr] = []; });
 
   Object.entries(byTS).forEach(([ts, slots]) => {
     const d = new Date(parseInt(ts));
@@ -1186,6 +1198,8 @@ function calculateAndRender() {
       agg[m.messpunktNr][mk].cons += c;
       agg[m.messpunktNr][mk].vzev += vzev;
       agg[m.messpunktNr][mk].grid += c-vzev;
+      // Track distribution share for intervals where solar is self-consumed
+      if (sc > 0 && totalC > 0) distStats[m.messpunktNr].push((c/totalC)*100);
     });
     prodMeters.forEach(pm => {
       const sl=slots[pm.messpunktNr]; const pmP=sl?Math.max(sl.bezug,sl.einspeisung):0;
@@ -1208,9 +1222,9 @@ function calculateAndRender() {
 
   renderSummary(tot, scRate, ssRate);
   renderMonthly(monthly, tariff, consMeters.length);
-  renderMeterAgg(agg, meters);
+  renderMeterAgg(agg, meters, distStats);
   renderCosts(agg, meters, tariff);
-  renderCharts(monthly);
+  renderCharts(monthly, consMeters, agg);
   renderMethodologyExample(byTS, consMeters, prodMeters);
   document.getElementById('results').classList.remove('hidden');
   setStep(3);
@@ -1263,16 +1277,28 @@ function renderMonthly(monthly, tariff, nV) {
     <td class="tr tc">${fmtCHF(sT)}</td></tr>`;
 }
 
-function renderMeterAgg(agg, meters) {
+function renderMeterAgg(agg, meters, distStats) {
   document.querySelector('#meterTable thead').innerHTML=`<tr>
     <th>Bezeichnung</th><th>Messpunkt</th><th>Typ</th>
     <th class="tr">Verbrauch kWh</th><th class="tr">Produktion kWh</th>
-    <th class="tr">vZEV-Anteil kWh</th><th class="tr">Netzbezug kWh</th><th class="tr">Eigendeckung</th></tr>`;
+    <th class="tr">vZEV-Anteil kWh</th><th class="tr">Netzbezug kWh</th>
+    <th class="tr">Eigendeckung</th>
+    <th class="tr">Ø Solar-Zuteilung</th>
+    <th class="tr">Spanne (Min–Max)</th></tr>`;
   document.querySelector('#meterTable tbody').innerHTML=meters.map(m=>{
     let c=0,v=0,g=0,p=0;
     Object.values(agg[m.messpunktNr]||{}).forEach(d=>{c+=d.cons;v+=d.vzev;g+=d.grid;p+=d.prod;});
     const isP=m.typ==='Produktion';
     const typeTag=`<span style="font-size:.68rem;font-weight:700;padding:.18rem .5rem;border-radius:2px;${isP?'background:var(--green-light);color:var(--green)':'background:var(--blue-light);color:var(--blue)'}">${m.typ}</span>`;
+    // Distribution stats
+    let avgShare='–', rangeStr='–';
+    if (!isP && distStats?.[m.messpunktNr]?.length) {
+      const s = distStats[m.messpunktNr];
+      const avg = s.reduce((a,b)=>a+b,0)/s.length;
+      const min = Math.min(...s), max = Math.max(...s);
+      avgShare = `<strong>${avg.toFixed(1)}%</strong>`;
+      rangeStr = `${min.toFixed(0)}% – ${max.toFixed(0)}%`;
+    }
     return `<tr>
       <td><div style="font-weight:700;color:var(--text)">${m.label||'–'}</div>${m.adresse?`<div style="font-size:.72rem;color:var(--text-muted)">${m.adresse}</div>`:''}</td>
       <td style="font-size:.65rem;font-family:monospace;color:var(--text-faint);max-width:160px;overflow:hidden;text-overflow:ellipsis">${m.messpunktNr}</td>
@@ -1281,7 +1307,9 @@ function renderMeterAgg(agg, meters) {
       <td class="tr tg">${p>0?p.toFixed(1):'–'}</td>
       <td class="tr">${!isP?v.toFixed(1):'–'}</td>
       <td class="tr">${!isP?g.toFixed(1):'–'}</td>
-      <td class="tr">${!isP?(c>0?v/c*100:0).toFixed(1)+'%':'–'}</td></tr>`;
+      <td class="tr">${!isP?(c>0?v/c*100:0).toFixed(1)+'%':'–'}</td>
+      <td class="tr">${avgShare}</td>
+      <td class="tr" style="color:var(--text-muted)">${rangeStr}</td></tr>`;
   }).join('');
 }
 
@@ -1316,13 +1344,17 @@ function renderCosts(agg, meters, tariff) {
   document.querySelector('#costTable tbody').innerHTML=rows.join('');
 }
 
-function renderCharts(monthly) {
+let chartDist = null;
+
+function renderCharts(monthly, consMeters, agg) {
   const months=Object.keys(monthly).sort();
   const labels=months.map(fmtMonth);
   if (chartMonthly) chartMonthly.destroy();
   if (chartPie) chartPie.destroy();
+  if (chartDist) chartDist.destroy();
   Chart.defaults.font.family = 'Manrope';
   Chart.defaults.color = '#7A8CA8';
+
   chartMonthly=new Chart(document.getElementById('chartMonthly'),{
     type:'bar',
     data:{ labels, datasets:[
@@ -1333,6 +1365,7 @@ function renderCharts(monthly) {
     options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{ font:{size:11,weight:'600'}, boxWidth:10, boxHeight:10 } } },
       scales:{ x:{ grid:{display:false}, ticks:{font:{size:11}} }, y:{ grid:{color:'#EBF1FB', lineWidth:1}, border:{display:false}, ticks:{font:{size:11}} } } }
   });
+
   const tG=Object.values(monthly).reduce((s,m)=>s+m.grid,0);
   const tV=Object.values(monthly).reduce((s,m)=>s+m.vzev,0);
   const tF=Object.values(monthly).reduce((s,m)=>s+m.fi,0);
@@ -1344,6 +1377,42 @@ function renderCharts(monthly) {
     options:{ responsive:true, cutout:'62%',
       plugins:{ legend:{ position:'bottom', labels:{ font:{size:11,weight:'600'}, boxWidth:10, boxHeight:10 } } } }
   });
+
+  // Distribution chart: monthly % share of vzev per consumer
+  if (consMeters && agg) {
+    const COLORS = ['#0046B0','#3AAA6A','#7C5CBF','#E6900A','#C0392B','#0891B2'];
+    const distDatasets = consMeters.map((m,i) => {
+      const data = months.map(mk => {
+        const d = agg[m.messpunktNr]?.[mk];
+        // Share = this meter's vzev / total vzev in this month
+        const totalVzev = monthly[mk]?.vzev || 0;
+        return totalVzev > 0 && d ? +((d.vzev / totalVzev)*100).toFixed(1) : 0;
+      });
+      return {
+        label: m.label || m.messpunktNr.slice(-8),
+        data,
+        backgroundColor: COLORS[i % COLORS.length],
+        borderRadius: 2,
+        barPercentage: .65
+      };
+    });
+    chartDist = new Chart(document.getElementById('chartDist'), {
+      type: 'bar',
+      data: { labels, datasets: distDatasets },
+      options: {
+        responsive: true,
+        scales: {
+          x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 } } },
+          y: { stacked: true, min: 0, max: 100, grid: { color: '#EBF1FB' }, border: { display: false },
+               ticks: { font: { size: 11 }, callback: v => v + '%' } }
+        },
+        plugins: {
+          legend: { position: 'bottom', labels: { font: { size: 11, weight: '600' }, boxWidth: 10, boxHeight: 10 } },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%` } }
+        }
+      }
+    });
+  }
 }
 
 // ── METHODOLOGY EXAMPLE ─────────────────────────────────────────────────────
