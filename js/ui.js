@@ -20,10 +20,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const idx = parseInt(sel.id.replace('typ_', ''), 10);
       updateTypeStyle(sel, idx);
     }
-    const cb = e.target.closest('input[type="checkbox"][id^="prio_"]');
-    if (cb) {
-      const idx = parseInt(cb.id.replace('prio_', ''), 10);
-      updatePrioVisual(idx, cb.checked);
+  });
+  grid.addEventListener('click', e => {
+    const btn = e.target.closest('.mp-delete-btn');
+    if (btn) {
+      const card = btn.closest('.meter-cfg-card');
+      if (card) card.style.display = 'none';
     }
   });
 });
@@ -124,7 +126,8 @@ function buildMeterConfig() {
     const dMax   = new Date(Math.max(...mData.map(r => r.datum.getTime())));
 
     return `
-    <div class="meter-cfg-card${isPrio ? ' is-priority' : ''}" id="card_${i}">
+    <div class="meter-cfg-card" id="card_${i}">
+      <button class="mp-delete-btn" title="Messpunkt entfernen" type="button">×</button>
       ${known ? '<span class="found-badge">✓ Bekannt</span>' : ''}
       <div class="mpid">${mp}</div>
       <div class="cfg-row">
@@ -153,12 +156,6 @@ function buildMeterConfig() {
           <input type="text" id="zaehler_${i}" value="${zaehlerNr}" placeholder="z. B. 10781966">
         </div>
       </div>
-      <div id="priorow_${i}" style="${typ !== 'Verbrauch' ? 'display:none' : ''}">
-        <label class="prio-toggle${isPrio ? ' active' : ''}" id="priolabel_${i}">
-          <input type="checkbox" id="prio_${i}" ${isPrio ? 'checked' : ''}>
-          ☀ PV-Priorität: Solarstrom wird zuerst diesem Zähler zugeteilt
-        </label>
-      </div>
       <div class="meter-stats">
         ${mData.length.toLocaleString('de-CH')} Messwerte &nbsp;·&nbsp; ${fmt(dMin)} – ${fmt(dMax)}
         ${totalB > 0 ? `&nbsp;·&nbsp; Bezug: <strong>${totalB.toFixed(1)} kWh</strong>` : ''}
@@ -179,27 +176,22 @@ function buildMeterConfig() {
 
 function updateTypeStyle(sel, idx) {
   sel.className = sel.value.toLowerCase();
-  const prioRow = document.getElementById('priorow_' + idx);
-  if (prioRow) prioRow.style.display = sel.value === 'Verbrauch' ? '' : 'none';
-}
-
-function updatePrioVisual(idx, checked) {
-  document.getElementById('priolabel_' + idx)?.classList.toggle('active', checked);
-  document.getElementById('card_' + idx)?.classList.toggle('is-priority', checked);
 }
 
 // ── Config readers (used by calculator.js) ────────────────────────────────────
 
 function getMeterConfig() {
-  return AppState.detectedMPs.map((mp, i) => ({
-    messpunktNr: mp,
-    typ:         document.getElementById('typ_' + i)?.value || 'Verbrauch',
-    priority:    document.getElementById('typ_' + i)?.value === 'Verbrauch' &&
-                 (document.getElementById('prio_' + i)?.checked || false),
-    label:       document.getElementById('label_' + i)?.value.trim()   || mp.slice(-8),
-    adresse:     document.getElementById('adresse_' + i)?.value.trim() || '',
-    zaehlerNr:   document.getElementById('zaehler_' + i)?.value.trim() || ''
-  })).filter(m => m.typ !== 'ignore');
+  return AppState.detectedMPs.map((mp, i) => {
+    const card = document.getElementById('card_' + i);
+    if (card && card.style.display === 'none') return null; // deleted by user
+    return {
+      messpunktNr: mp,
+      typ:         document.getElementById('typ_' + i)?.value || 'Verbrauch',
+      label:       document.getElementById('label_' + i)?.value.trim()   || mp.slice(-8),
+      adresse:     document.getElementById('adresse_' + i)?.value.trim() || '',
+      zaehlerNr:   document.getElementById('zaehler_' + i)?.value.trim() || ''
+    };
+  }).filter(m => m && m.typ !== 'ignore');
 }
 
 function getTariff() {

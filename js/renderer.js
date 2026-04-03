@@ -67,7 +67,7 @@ function renderMonthly(monthly, tariff, nV) {
   document.querySelector('#monthlyTable tbody').innerHTML = rows.join('');
 }
 
-function renderMeterAgg(agg, meters, distStats, hasPriority) {
+function renderMeterAgg(agg, meters, distStats) {
   document.querySelector('#meterTable thead').innerHTML = `<tr>
     <th>Bezeichnung</th><th>Messpunkt</th><th>Typ</th>
     <th class="tr">Verbrauch kWh</th><th class="tr">Produktion kWh</th>
@@ -79,14 +79,11 @@ function renderMeterAgg(agg, meters, distStats, hasPriority) {
   document.querySelector('#meterTable tbody').innerHTML = meters.map(m => {
     let c = 0, v = 0, g = 0, p = 0;
     Object.values(agg[m.messpunktNr] || {}).forEach(d => { c += d.cons; v += d.vzev; g += d.grid; p += d.prod; });
-    const isP    = m.typ === 'Produktion';
-    const isPrio = m.priority && !isP;
+    const isP       = m.typ === 'Produktion';
     const typeStyle = isP
       ? 'background:var(--green-light);color:var(--green)'
-      : isPrio
-        ? 'background:#FEF3DC;color:#8A4F00'
-        : 'background:var(--blue-light);color:var(--blue)';
-    const typeLabel = isP ? 'Produktion' : isPrio ? '☀ Priorität' : 'Verbrauch';
+      : 'background:var(--blue-light);color:var(--blue)';
+    const typeLabel = isP ? 'Produktion' : 'Verbrauch';
     const typeTag   = `<span style="font-size:.68rem;font-weight:700;padding:.18rem .5rem;border-radius:2px;${typeStyle}">${typeLabel}</span>`;
 
     let avgShare = '–', rangeStr = '–';
@@ -305,4 +302,93 @@ function renderMethodologyExample(byTS, consMeters, prodMeters) {
     `Zahlenbeispiel – ${d.toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' })} ${d.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })} Uhr`;
   const ph = document.getElementById('examplePlaceholder');
   if (ph) ph.textContent = '· Intervall mit höchstem Eigenverbrauch aus den hochgeladenen Daten';
+}
+
+// ── DAY PROFILE CHART ─────────────────────────────────────────────────────────
+// Builds the average 15-min load profile (00:00–23:45) for each meter.
+
+function renderDayProfile(byTS, meters) {
+  if (AppState.charts.dayProfile) AppState.charts.dayProfile.destroy();
+
+  // Build the 96 time-of-day slot labels.
+  const TIME_SLOTS = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      TIME_SLOTS.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+    }
+  }
+
+  // Accumulate per-meter, per-slot sums and counts.
+  const profiles = {}; // { mpId: { slotKey: { sum, count } } }
+  meters.forEach(m => { profiles[m.messpunktNr] = {}; });
+
+  Object.entries(byTS).forEach(([ts, slots]) => {
+    const d       = new Date(parseInt(ts, 10));
+    const slotKey = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+    meters.forEach(m => {
+      const sl = slots[m.messpunktNr];
+      if (!sl) return;
+      const val = m.typ === 'Produktion'
+        ? Math.max(sl.bezug, sl.einspeisung)
+        : (sl.bezug || 0);
+      if (!profiles[m.messpunktNr][slotKey]) profiles[m.messpunktNr][slotKey] = { sum: 0, count: 0 };
+      profiles[m.messpunktNr][slotKey].sum   += val;
+      profiles[m.messpunktNr][slotKey].count += 1;
+    });
+  });
+
+  const COLORS = ['#0046B0', '#3AAA6A', '#7C5CBF', '#E6900A', '#C0392B', '#0891B2'];
+
+  const datasets = meters.map((m, i) => {
+    const isP  = m.typ === 'Produktion';
+    const data = TIME_SLOTS.map(slot => {
+      const p = profiles[m.messpunktNr][slot];
+      return p && p.count > 0 ? +(p.sum / p.count).toFixed(4) : 0;
+    });
+    return {
+      label:           (m.label || m.messpunktNr.slice(-8)) + (isP ? ' (Solar)' : ''),
+      data,
+      borderColor:     COLORS[i % COLORS.length],
+      backgroundColor: COLORS[i % COLORS.length] + '18',
+      borderWidth:     isP ? 2 : 1.5,
+      borderDash:      isP ? [4, 3] : [],
+      pointRadius:     0,
+      tension:         0.35,
+      fill:            isP
+    };
+  });
+
+  // Show only every 4th label on x-axis (every full hour).
+  AppState.charts.dayProfile = new Chart(document.getElementById('chartDayProfile'), {
+    type: 'line',
+    data: { labels: TIME_SLOTS, datasets },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 11, weight: '600' }, boxWidth: 12, boxHeight: 2 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(3)} kWh`
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: {
+            font: { size: 10 },
+            maxRotation: 0,
+            callback: (val, idx) => idx % 4 === 0 ? TIME_SLOTS[idx] : ''
+          }
+        },
+        y: {
+          grid: { color: '#EBF1FB', lineWidth: 1 },
+          border: { display: false },
+          ticks: { font: { size: 11 }, callback: v => v.toFixed(2) + ' kWh' }
+        }
+      }
+    }
+  });
 }

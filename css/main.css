@@ -322,6 +322,7 @@ main {
 .meter-config-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 1rem; }
 
 .meter-cfg-card {
+  position: relative;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 1.25rem;
@@ -397,6 +398,26 @@ main {
   padding-top: .65rem;
   line-height: 1.7;
 }
+
+.mp-delete-btn {
+  position: absolute;
+  top: .6rem;
+  right: .6rem;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition), color var(--transition);
+}
+.mp-delete-btn:hover { background: var(--red-light); color: var(--red); }
 
 .prio-toggle {
   display: flex;

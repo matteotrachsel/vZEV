@@ -13,14 +13,10 @@ function calculateAndRender() {
   const meters     = getMeterConfig();
   const tariff     = getTariff();
   const prodMeters = meters.filter(m => m.typ === 'Produktion');
-  const prioMeters = meters.filter(m => m.typ === 'Verbrauch' && m.priority);
-  const normMeters = meters.filter(m => m.typ === 'Verbrauch' && !m.priority);
   const consMeters = meters.filter(m => m.typ === 'Verbrauch');
 
   if (!consMeters.length) { alert('Mindestens einen Verbrauch-Messpunkt konfigurieren.'); return; }
   if (!prodMeters.length) { alert('Mindestens einen Produktions-Messpunkt konfigurieren.'); return; }
-
-  const hasPriority = prioMeters.length > 0;
 
   // Index all readings by timestamp for O(1) lookup.
   const byTS = {};
@@ -38,48 +34,29 @@ function calculateAndRender() {
   const distStats = {};
   consMeters.forEach(m => { distStats[m.messpunktNr] = []; });
 
-  // ── Per-interval distribution ─────────────────────────────────────────────
+  // ── Per-interval proportional distribution ────────────────────────────────
   Object.entries(byTS).forEach(([ts, slots]) => {
     const d  = new Date(parseInt(ts, 10));
     const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
-    const prod = prodMeters.reduce((s, m) => {
+    const prod   = prodMeters.reduce((s, m) => {
       const sl = slots[m.messpunktNr];
       return s + (sl ? Math.max(sl.bezug, sl.einspeisung) : 0);
     }, 0);
 
-    // Step 1: priority meters consume solar first (proportional among themselves).
-    const prioCons  = prioMeters.map(m => ({ m, c: slots[m.messpunktNr]?.bezug || 0 }));
-    const totalPrio = prioCons.reduce((s, x) => s + x.c, 0);
-    const scPrio    = Math.min(prod, totalPrio);
+    const consList = consMeters.map(m => ({ m, c: slots[m.messpunktNr]?.bezug || 0 }));
+    const totalC   = consList.reduce((s, x) => s + x.c, 0);
+    const sc       = Math.min(prod, totalC);
+    const fi       = Math.max(0, prod - totalC);
 
-    prioCons.forEach(({ m, c }) => {
-      const vzev = totalPrio > 0 ? (c / totalPrio) * scPrio : 0;
+    consList.forEach(({ m, c }) => {
+      const vzev = totalC > 0 ? (c / totalC) * sc : 0;
       if (!agg[m.messpunktNr][mk]) agg[m.messpunktNr][mk] = { cons: 0, vzev: 0, grid: 0, prod: 0 };
       agg[m.messpunktNr][mk].cons += c;
       agg[m.messpunktNr][mk].vzev += vzev;
       agg[m.messpunktNr][mk].grid += c - vzev;
-      if (scPrio > 0 && totalPrio > 0) distStats[m.messpunktNr].push((c / totalPrio) * 100);
+      if (sc > 0 && totalC > 0) distStats[m.messpunktNr].push((c / totalC) * 100);
     });
-
-    // Step 2: surplus solar distributed proportionally to non-priority meters.
-    const prodLeft  = Math.max(0, prod - scPrio);
-    const normCons  = normMeters.map(m => ({ m, c: slots[m.messpunktNr]?.bezug || 0 }));
-    const totalNorm = normCons.reduce((s, x) => s + x.c, 0);
-    const scNorm    = Math.min(prodLeft, totalNorm);
-
-    normCons.forEach(({ m, c }) => {
-      const vzev = totalNorm > 0 ? (c / totalNorm) * scNorm : 0;
-      if (!agg[m.messpunktNr][mk]) agg[m.messpunktNr][mk] = { cons: 0, vzev: 0, grid: 0, prod: 0 };
-      agg[m.messpunktNr][mk].cons += c;
-      agg[m.messpunktNr][mk].vzev += vzev;
-      agg[m.messpunktNr][mk].grid += c - vzev;
-      if (scNorm > 0 && totalNorm > 0) distStats[m.messpunktNr].push((c / totalNorm) * 100);
-    });
-
-    const totalC = totalPrio + totalNorm;
-    const sc     = scPrio + scNorm;
-    const fi     = Math.max(0, prod - totalC);
 
     prodMeters.forEach(pm => {
       const sl  = slots[pm.messpunktNr];
@@ -118,9 +95,10 @@ function calculateAndRender() {
   // ── Render all sections ───────────────────────────────────────────────────
   renderSummary(tot, scRate, ssRate);
   renderMonthly(monthly, tariff, consMeters.length);
-  renderMeterAgg(agg, meters, distStats, hasPriority);
+  renderMeterAgg(agg, meters, distStats);
   renderCosts(agg, meters, tariff);
   renderCharts(monthly, consMeters, agg);
+  renderDayProfile(byTS, meters);
   renderMethodologyExample(byTS, consMeters, prodMeters);
 
   document.getElementById('results').classList.remove('hidden');
