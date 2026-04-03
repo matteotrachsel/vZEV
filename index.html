@@ -138,15 +138,15 @@
   </div>
 
   <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem">
-      <div class="tariff-tag">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M6 3.5v2.5l1.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        BKW Energy Blue 2026 · PVshare
-      </div>
-      <button id="fetchTariffBtn" class="btn btn-outline btn-sm">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M11 6.5A4.5 4.5 0 112 6.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M11 3v3.5H7.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Aktuelle Tarife laden
-      </button>
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem">
+      <label class="btn btn-outline btn-sm" style="cursor:pointer">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 2v7M6.5 2L4 4.5M6.5 2L9 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 10.5h9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        BKW Tarifdatei laden (.json)
+        <input type="file" id="tariffFileInput" accept=".json" style="display:none">
+      </label>
+      <select id="tariffSelect" class="btn btn-outline btn-sm" style="display:none;cursor:pointer;font-weight:600">
+        <option value="">Tarif wählen…</option>
+      </select>
     </div>
     <div id="tariffFetchStatus" style="margin-bottom:.75rem"></div>
     <div class="tariff-grid">
@@ -187,6 +187,45 @@
     <p style="margin-top:1rem;font-size:.73rem;color:var(--text-muted);font-weight:500">
       Tarifdaten gemäss BKW Energy Blue 2026 und PVshare-Vertrag. Alle Werte vor der ersten Auswertung prüfen und anpassen.
     </p>
+  </div>
+</div>
+
+<!-- SECTION 3b: Invoice Header -->
+<div class="section">
+  <div class="section-head">
+    <span class="section-num" style="background:#F0F4F9;color:var(--text-mid)">Rechnung</span>
+    <div>
+      <div class="section-title">Rechnungskopf konfigurieren</div>
+      <div class="section-desc">Absender-Informationen auf der PDF-Rechnung</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="tariff-grid">
+      <div class="tfield" style="flex:1 1 200px">
+        <label>Rechnungssteller / Name</label>
+        <input type="text" id="invSenderName" value="vZEV Ogimatte" placeholder="z. B. vZEV Ogimatte">
+      </div>
+      <div class="tfield" style="flex:1 1 180px">
+        <label>Strasse / Hausnummer</label>
+        <input type="text" id="invSenderStreet" value="Ogimatte 7" placeholder="z. B. Musterstrasse 1">
+      </div>
+      <div class="tfield" style="flex:1 1 180px">
+        <label>PLZ / Ort</label>
+        <input type="text" id="invSenderCity" value="3713 Reichenbach im Kandertal" placeholder="z. B. 3000 Bern">
+      </div>
+      <div class="tfield" style="flex:1 1 180px">
+        <label>Kontakt (optional)</label>
+        <input type="text" id="invSenderContact" value="" placeholder="z. B. vzev@example.ch">
+      </div>
+      <div class="tfield" style="flex:1 1 180px">
+        <label>IBAN (optional)</label>
+        <input type="text" id="invIBAN" value="" placeholder="z. B. CH56 0483 5012 3456 7800 9">
+      </div>
+      <div class="tfield" style="flex:1 1 180px">
+        <label>Zahlungsfrist</label>
+        <input type="text" id="invPaymentTerm" value="30 Tage" placeholder="z. B. 30 Tage">
+      </div>
+    </div>
   </div>
 </div>
 

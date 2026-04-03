@@ -1,6 +1,14 @@
 // ── PARSER ────────────────────────────────────────────────────────────────────
 // Reads XLSX/XLS/CSV files and normalises rows into the internal data format.
 
+// Parses Swiss date strings like "1.4.2026 00:00:00" or "31.12.2026 23:45:00"
+function parseSwissDate(str) {
+  if (!str) return new Date(NaN);
+  const m = String(str).match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{2})/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5], 0);
+  return new Date(str); // fallback for ISO strings
+}
+
 function readExcel(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -35,7 +43,7 @@ function parseRows(rows) {
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
     if (!r || !r[cMP] || !r[cD]) continue;
-    const d = r[cD] instanceof Date ? r[cD] : new Date(r[cD]);
+    const d = r[cD] instanceof Date ? r[cD] : parseSwissDate(String(r[cD]));
     if (isNaN(d)) continue;
     out.push({
       messpunkt:   String(r[cMP]).trim(),

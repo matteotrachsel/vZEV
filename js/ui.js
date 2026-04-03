@@ -32,7 +32,10 @@ function setupStaticHandlers() {
   document.getElementById('calculateBtn').addEventListener('click', calculateAndRender);
   document.getElementById('exportBtn').addEventListener('click', exportCSV);
   document.getElementById('pdfBtn').addEventListener('click', exportPDF);
-  document.getElementById('fetchTariffBtn').addEventListener('click', fetchLatestTariff);
+  document.getElementById('tariffFileInput').addEventListener('change', function() {
+    if (this.files[0]) loadTariffFromJSON(this.files[0]);
+  });
+  document.getElementById('tariffSelect').addEventListener('change', applySelectedTariff);
 }
 
 // ── Wizard step indicator ─────────────────────────────────────────────────────
@@ -209,78 +212,71 @@ function getTariff() {
   return { energyAllIn, vzevPrice, grundtarif, pvshareAbo, feedIn, splitBase };
 }
 
-// ── BKW tariff fetch ──────────────────────────────────────────────────────────
+// ── BKW tariff JSON loader ────────────────────────────────────────────────────
 
-async function fetchLatestTariff() {
-  const btn      = document.getElementById('fetchTariffBtn');
+async function loadTariffFromJSON(file) {
   const statusEl = document.getElementById('tariffFetchStatus');
-
-  btn.disabled    = true;
-  btn.textContent = 'Laden…';
-  statusEl.innerHTML = '';
-
-  // BKW blocks direct browser fetches (CORS). Try two public CORS proxies in sequence.
-  const TARGET = 'https://www.bkw.ch/de/tarife-json';
-  const PROXIES = [
-    `https://corsproxy.io/?${encodeURIComponent(TARGET)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(TARGET)}`
-  ];
-
+  statusEl.innerHTML = mkAlert('ai', `Lade <strong>${file.name}</strong>…`);
   try {
-    let res = null;
-    for (const proxy of PROXIES) {
-      try { res = await fetch(proxy); if (res.ok) break; } catch (_) { /* try next */ }
-    }
-    if (!res || !res.ok) throw new Error(`HTTP ${res?.status ?? 'unreachable'}`);
-    const data = await res.json();
+    const text = await file.text();
+    const data = JSON.parse(text);
+    AppState.tariffJSON = data;
 
-    // Walk the JSON tree to find numeric tariff values.
-    // BKW JSON structure: try common key names for energy price (Rp/kWh) and base price (CHF/month).
-    let energyPrice = null;
-    let basePrice   = null;
-
-    function walk(obj, path) {
-      if (!obj || typeof obj !== 'object') return;
-      for (const [key, val] of Object.entries(obj)) {
-        const k = key.toLowerCase();
-        if (typeof val === 'number' && val > 0) {
-          if (energyPrice === null && (k.includes('energie') || k.includes('arbeit')) && val < 100) {
-            energyPrice = val;
-          }
-          if (basePrice === null && (k.includes('grund') || k.includes('base') || k.includes('fix')) && val < 50) {
-            basePrice = val;
-          }
-        } else if (typeof val === 'object') {
-          walk(val, path + '.' + key);
-        }
-      }
-    }
-    walk(data, '');
-
-    let updated = [];
-    if (energyPrice !== null) {
-      document.getElementById('energyPrice').value = energyPrice.toFixed(2);
-      updated.push(`Energiepreis: ${energyPrice.toFixed(2)} Rp/kWh`);
-    }
-    if (basePrice !== null) {
-      document.getElementById('basePrice').value = basePrice.toFixed(2);
-      updated.push(`Grundpreis: ${basePrice.toFixed(2)} CHF/Mt.`);
+    const tariffs = (data.tariffs || []).filter(t => t.tariffType === 'electricity');
+    if (!tariffs.length) {
+      statusEl.innerHTML = mkAlert('aw', 'Keine Stromtarife in der Datei gefunden.');
+      return;
     }
 
-    if (updated.length) {
-      statusEl.innerHTML = mkAlert('as', `Tarife aktualisiert – ${updated.join(', ')}`);
-      if (AppState.parsedData.length) calculateAndRender();
-    } else {
-      statusEl.innerHTML = mkAlert('aw',
-        'Tarife geladen, aber keine auswertbaren Werte erkannt. Bitte Werte manuell prüfen.'
-      );
-    }
-  } catch (e) {
-    statusEl.innerHTML = mkAlert('ae',
-      `Tarife konnten nicht geladen werden (${e.message}). Bitte Werte manuell eingeben.`
+    const sel = document.getElementById('tariffSelect');
+    sel.innerHTML = '<option value="">Tarif wählen…</option>' +
+      tariffs.map((t, i) => `<option value="${i}">${t.tariffName}</option>`).join('');
+    sel.style.display = '';
+    sel.value = '';
+
+    const dso = data.dsoName || file.name;
+    statusEl.innerHTML = mkAlert('as',
+      `<strong>${dso}</strong> geladen · ${tariffs.length} Tarife verfügbar · Tarif rechts wählen`
     );
-  } finally {
-    btn.disabled    = false;
-    btn.textContent = 'Aktuelle Tarife laden';
+  } catch (e) {
+    statusEl.innerHTML = mkAlert('ae', `Fehler beim Laden der Tarifdatei: ${e.message}`);
   }
+}
+
+function applySelectedTariff() {
+  const statusEl = document.getElementById('tariffFetchStatus');
+  const sel   = document.getElementById('tariffSelect');
+  const idx   = parseInt(sel.value, 10);
+  if (isNaN(idx) || !AppState.tariffJSON) return;
+
+  const tariff = (AppState.tariffJSON.tariffs || []).filter(t => t.tariffType === 'electricity')[idx];
+  if (!tariff) return;
+
+  const basePrice    = tariff.prices?.base?.price;
+  const energyPrices = tariff.prices?.energy || [];
+  // For multilevel (HT/NT), use the daytime (HT) price (from 07:00); fallback to first.
+  const htEntry = energyPrices.find(e => e.from === '07:00') || energyPrices[0];
+  const energyPrice = htEntry?.price; // CHF/kWh
+
+  if (basePrice != null) document.getElementById('grundtarif').value = basePrice.toFixed(2);
+
+  const parts = [`Tarif <strong>${tariff.tariffName}</strong>`];
+  if (basePrice   != null) parts.push(`Grundtarif: ${basePrice.toFixed(2)} CHF/Mt.`);
+  if (energyPrice != null) parts.push(`Energiepreis (BKW): ${(energyPrice * 100).toFixed(2)} Rp/kWh`);
+  statusEl.innerHTML = mkAlert('as', parts.join(' · '));
+
+  if (AppState.parsedData.length) calculateAndRender();
+}
+
+// ── Invoice header config ─────────────────────────────────────────────────────
+
+function getInvoiceHeader() {
+  return {
+    name:        document.getElementById('invSenderName')?.value.trim()    || 'vZEV Ogimatte',
+    street:      document.getElementById('invSenderStreet')?.value.trim()  || '',
+    city:        document.getElementById('invSenderCity')?.value.trim()    || '',
+    contact:     document.getElementById('invSenderContact')?.value.trim() || '',
+    iban:        document.getElementById('invIBAN')?.value.trim()          || '',
+    paymentTerm: document.getElementById('invPaymentTerm')?.value.trim()   || '30 Tage'
+  };
 }
