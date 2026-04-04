@@ -1,320 +1,412 @@
 // ── INVOICE (PDF) ─────────────────────────────────────────────────────────────
-// Generates a professional A4 PDF invoice for each consumption meter.
-// Requires jsPDF + jsPDF-AutoTable (loaded via CDN in index.html).
+// Generates a BKW-style A4 PDF invoice (cover page + one detail page per meter).
 
 function exportPDF() {
   const result = AppState.lastResult;
-  if (!result) {
-    alert('Bitte zuerst eine Auswertung erstellen.');
-    return;
-  }
+  if (!result) { alert('Bitte zuerst eine Auswertung erstellen.'); return; }
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
   const { agg, monthly, tot, scRate, ssRate, meters, tariff, periodStart, periodEnd } = result;
-  const cM      = meters.filter(m => m.typ === 'Verbrauch');
-  const mc      = getMonthCount();
-  const totalFee = mc * (tariff.grundtarif + tariff.pvshareAbo);
-  const header   = getInvoiceHeader();
+  const cM     = meters.filter(m => m.typ === 'Verbrauch');
+  const mc     = getMonthCount();
+  const header = getInvoiceHeader();
 
-  // Pre-compute per-meter grid/vzev totals.
-  const meterGrid = cM.map(m => {
-    let g = 0;
-    Object.values(agg[m.messpunktNr] || {}).forEach(d => { g += d.grid; });
-    return g;
-  });
-  const meterVzev = cM.map(m => {
-    let v = 0;
-    Object.values(agg[m.messpunktNr] || {}).forEach(d => { v += d.vzev; });
-    return v;
-  });
-  const totalGrid = meterGrid.reduce((s, g) => s + g, 0);
+  const today      = new Date();
+  const dateStr    = fmt(today);
+  const dueDate    = new Date(today); dueDate.setDate(dueDate.getDate() + 30);
+  const dueDateStr = fmt(dueDate);
+  const invNr      = `vZEV-${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}-001`;
 
-  const today     = new Date();
-  const dateStr   = today.toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  const periodStr = `${fmt(periodStart)} – ${fmt(periodEnd)}`;
-  const invBase   = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}`;
-
-  cM.forEach((m, idx) => {
-    if (idx > 0) doc.addPage();
-
-    const g   = meterGrid[idx];
-    const v   = meterVzev[idx];
-    let cons  = 0;
-    Object.values(agg[m.messpunktNr] || {}).forEach(d => { cons += d.cons; });
-
-    const eb    = g * tariff.energyAllIn;
-    const vz    = v * tariff.vzevPrice;
-    const fee   = tariff.splitBase
-      ? (totalGrid > 0 ? (g / totalGrid) * cM.length * totalFee : totalFee)
-      : totalFee;
-    const total = eb + vz + fee;
-    const invNr = `${invBase}-${String(idx + 1).padStart(2, '0')}`;
-
-    drawInvoicePage(doc, {
-      m, g, v, cons, eb, vz, fee, total,
-      tariff, mc, periodStr, dateStr, invNr,
-      scRate, ssRate, tot, header
+  // Pre-compute per-meter totals
+  const meterData = cM.map(m => {
+    let g = 0, v = 0, cons = 0, fiKwh = 0;
+    Object.values(agg[m.messpunktNr] || {}).forEach(d => {
+      g    += d.grid;
+      v    += d.vzev;
+      cons += d.cons;
+      fiKwh += (d.fi || 0);
     });
+    const grundtarifTotal = mc * tariff.grundtarif;
+    const pvshareTotal    = mc * tariff.pvshareAbo;
+    const eb     = g    * tariff.energyAllIn;
+    const vz     = v    * tariff.vzevPrice;
+    const fiAmt  = fiKwh * tariff.feedIn;
+    const subtotal = grundtarifTotal + pvshareTotal + eb + vz;
+    const total    = subtotal - fiAmt;
+    return { m, g, v, cons, fiKwh, eb, vz, grundtarifTotal, pvshareTotal, fiAmt, subtotal, total };
   });
 
-  doc.save(`vZEV_Rechnung_${today.toISOString().slice(0, 10)}.pdf`);
+  const totalPages = meterData.length + 1;
+
+  // Page 1: Cover / Summary
+  drawCoverPage(doc, { header, dateStr, dueDateStr, periodStr: `${fmt(periodStart)} – ${fmt(periodEnd)}`,
+    invNr, meterData, periodStart, periodEnd, totalPages });
+
+  // Pages 2+: Detail per meter
+  meterData.forEach((md, idx) => {
+    doc.addPage();
+    drawDetailPage(doc, { ...md, tariff, mc, agg, periodStart, periodEnd, invNr, header, pageNum: idx + 2, totalPages });
+  });
+
+  doc.save(`vZEV_Rechnung_${today.toISOString().slice(0,10)}.pdf`);
 }
 
-// ── Page renderer ─────────────────────────────────────────────────────────────
+// ── Shared style constants ────────────────────────────────────────────────────
 
-function drawInvoicePage(doc, p) {
-  const PW = 210, PH = 297;
-  const ML = 20, MR = 190;
-  const W  = MR - ML;
+const INV = {
+  ML: 20, MR: 190,
+  BLACK:  [0,   0,   0  ],
+  DGRAY:  [50,  50,  50 ],
+  GRAY:   [110, 110, 110],
+  LGRAY:  [170, 170, 170],
+  BORDER: [195, 195, 195],
+};
 
-  // ── Color palette ────────────────────────────────────────────────────────────
-  const blue      = [0, 70, 176];
-  const darkText  = [25, 25, 35];
-  const midText   = [90, 100, 115];
-  const lightText = [155, 163, 180];
-  const border    = [215, 222, 235];
-  const green     = [45, 158, 95];
+// ── Cover Page ────────────────────────────────────────────────────────────────
 
-  const hdr = p.header || {};
+function drawCoverPage(doc, { header, dateStr, dueDateStr, periodStr, invNr, meterData, periodStart, periodEnd, totalPages }) {
+  const { ML, MR, BLACK, DGRAY, GRAY, LGRAY, BORDER } = INV;
+  const hdr  = header || {};
+  const name = hdr.name || 'vZEV Ogimatte';
 
-  // ── Thin top bar ─────────────────────────────────────────────────────────────
-  doc.setFillColor(...blue);
-  doc.rect(0, 0, PW, 3.5, 'F');
-
-  // ── SENDER block (top left) ───────────────────────────────────────────────
-  let y = 13;
+  // ── Logo box (top right) ──────────────────────────────────────────────────
+  doc.setFillColor(30, 30, 30);
+  doc.roundedRect(MR - 36, 10, 36, 14, 1, 1, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
-  doc.setTextColor(...blue);
-  doc.text(hdr.name || 'vZEV Ogimatte', ML, y);
-
-  y += 4.5;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(...midText);
-  if (hdr.street) { doc.text(hdr.street, ML, y); y += 4; }
-  if (hdr.city)   { doc.text(hdr.city,   ML, y); y += 4; }
-  if (hdr.contact){ doc.text(hdr.contact, ML, y); y += 4; }
-
-  // ── RECHNUNG title + info (top right) ────────────────────────────────────
-  const rx = MR;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(22);
-  doc.setTextColor(...darkText);
-  doc.text('RECHNUNG', rx, 16, { align: 'right' });
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(...midText);
-  const metaLines = [
-    `Rechnungs-Nr. ${p.invNr}`,
-    `Datum:          ${p.dateStr}`,
-    `Periode:        ${p.periodStr}`,
-    `Dauer:          ${p.mc} Monat${p.mc !== 1 ? 'e' : ''}`
-  ];
-  metaLines.forEach((line, i) => {
-    doc.text(line, rx, 23 + i * 4.5, { align: 'right' });
-  });
-
-  // ── Divider ───────────────────────────────────────────────────────────────
-  const div1Y = 44;
-  doc.setDrawColor(...border);
-  doc.setLineWidth(0.35);
-  doc.line(ML, div1Y, MR, div1Y);
-
-  // ── RECIPIENT block (window position) ────────────────────────────────────
-  y = 51;
-  // small "sender line" above address (standard Swiss letter format)
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
-  doc.setTextColor(...lightText);
-  const senderLine = [hdr.name, hdr.city].filter(Boolean).join(' · ');
-  doc.text(senderLine, ML, y);
-
-  y += 5.5;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11.5);
-  doc.setTextColor(...darkText);
-  doc.text(p.m.label || p.m.messpunktNr, ML, y);
-
-  y += 5;
-  if (p.m.adresse) {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9.5);
-    doc.setTextColor(55, 60, 70);
-    doc.text(p.m.adresse, ML, y);
-    y += 5;
-  }
-
-  // ── Meter details (right column, parallel to address) ────────────────────
-  const dtX = ML + W * 0.54;
-  let dy = 57;
-  [
-    { label: 'Zähler-Nr.',  val: p.m.zaehlerNr || '—' },
-    { label: 'Messpunkt',   val: '…' + p.m.messpunktNr.slice(-12) },
-  ].forEach(d => {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(...lightText);
-    doc.text(d.label, dtX, dy);
-    dy += 4;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(...darkText);
-    doc.text(d.val, dtX, dy);
-    dy += 6;
-  });
-
-  // ── Second divider ────────────────────────────────────────────────────────
-  const div2Y = 88;
-  doc.setDrawColor(...border);
-  doc.setLineWidth(0.35);
-  doc.line(ML, div2Y, MR, div2Y);
-
-  // ── ENERGY SUMMARY BOXES ─────────────────────────────────────────────────
-  y = 94;
-  const eigenPct = p.cons > 0 ? (p.v / p.cons * 100).toFixed(1) : '0.0';
-  const boxes = [
-    { label: 'Gesamtverbrauch',         val: p.cons.toFixed(1), unit: 'kWh',                accent: blue  },
-    { label: 'vZEV-Eigenverbrauch',     val: p.v.toFixed(1),    unit: `kWh (${eigenPct}%)`, accent: green },
-    { label: 'Netzbezug (abgerechnet)', val: p.g.toFixed(1),    unit: 'kWh',                accent: [210, 105, 15] }
-  ];
-  const boxW = (W - 4) / 3;
-  boxes.forEach((b, i) => {
-    const bx = ML + i * (boxW + 2);
-    doc.setFillColor(249, 250, 253);
-    doc.setDrawColor(...border);
-    doc.setLineWidth(0.28);
-    doc.rect(bx, y, boxW, 23, 'FD');
-    doc.setFillColor(...b.accent);
-    doc.rect(bx, y, boxW, 3, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6);
-    doc.setTextColor(...lightText);
-    doc.text(b.label.toUpperCase(), bx + boxW / 2, y + 10.5, { align: 'center' });
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.setTextColor(...darkText);
-    doc.text(b.val, bx + boxW / 2, y + 17, { align: 'center' });
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.5);
-    doc.setTextColor(...lightText);
-    doc.text(b.unit, bx + boxW / 2, y + 21.5, { align: 'center' });
-  });
-
-  // ── COST TABLE ────────────────────────────────────────────────────────────
-  y = 124;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.setTextColor(...midText);
-  doc.text('KOSTENPOSITIONEN', ML, y);
-  y += 3;
-
-  doc.autoTable({
-    startY: y,
-    margin: { left: ML, right: PW - MR },
-    tableWidth: W,
-    head: [['Position', 'Menge', 'Tarif', 'Betrag CHF']],
-    body: [
-      ['Energiebezug BKW (all-in)',  `${p.g.toFixed(1)} kWh`, `${(p.tariff.energyAllIn * 100).toFixed(2)} Rp/kWh`, fmtCHF(p.eb)],
-      ['vZEV-Eigenverbrauch Solar',  `${p.v.toFixed(1)} kWh`, `${(p.tariff.vzevPrice   * 100).toFixed(2)} Rp/kWh`, fmtCHF(p.vz)],
-      ['Grundtarif BKW',             `${p.mc} Mt.`,           `${p.tariff.grundtarif.toFixed(2)} CHF/Mt.`,          fmtCHF(p.mc * p.tariff.grundtarif)],
-      ['PVshare Abo',                `${p.mc} Mt.`,           `${p.tariff.pvshareAbo.toFixed(2)} CHF/Mt.`,          fmtCHF(p.mc * p.tariff.pvshareAbo)]
-    ],
-    headStyles: {
-      fillColor: [...blue],
-      textColor: [255, 255, 255],
-      fontStyle: 'bold',
-      fontSize: 7.5,
-      cellPadding: { top: 4, bottom: 4, left: 4, right: 4 }
-    },
-    columnStyles: {
-      0: { cellWidth: 'auto' },
-      1: { halign: 'right', cellWidth: 28 },
-      2: { halign: 'right', cellWidth: 40 },
-      3: { halign: 'right', fontStyle: 'bold', cellWidth: 28 }
-    },
-    styles: {
-      fontSize: 8.5,
-      cellPadding: { top: 3.5, bottom: 3.5, left: 4, right: 4 },
-      lineColor: [...border],
-      lineWidth: 0.25,
-      textColor: [55, 62, 75]
-    },
-    alternateRowStyles: { fillColor: [249, 250, 253] }
-  });
-
-  // ── TOTAL BOX ─────────────────────────────────────────────────────────────
-  const tblBottom = doc.lastAutoTable.finalY;
-  const totBoxY   = tblBottom + 3;
-  const totBoxH   = 17;
-  const totBoxW   = 80;
-
-  // Light left side note
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(...midText);
-  doc.text(`Zahlbar innert ${p.header?.paymentTerm || '30 Tage'} ab Rechnungsdatum.`, ML, totBoxY + 7);
-  if (p.header?.iban) {
-    doc.text(`IBAN: ${p.header.iban}`, ML, totBoxY + 12.5);
-  }
-
-  // Total box (right-aligned)
-  doc.setFillColor(...blue);
-  doc.rect(MR - totBoxW, totBoxY, totBoxW, totBoxH, 'F');
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.setTextColor(160, 195, 235);
-  doc.text('TOTAL NETTO (exkl. MwSt.)', MR - 4, totBoxY + 5.5, { align: 'right' });
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(17);
+  doc.setFontSize(13);
   doc.setTextColor(255, 255, 255);
-  doc.text(`CHF ${fmtCHF(p.total)}`, MR - 4, totBoxY + 14, { align: 'right' });
+  doc.text(name, MR - 18, 18.5, { align: 'center' });
 
-  // ── CALCULATION NOTE ──────────────────────────────────────────────────────
-  y = totBoxY + totBoxH + 11;
-  doc.setLineWidth(1.5);
-  doc.setDrawColor(...green);
-  doc.line(ML, y, ML, y + 20);
-  doc.setLineWidth(0.3);
-
+  // ── Sender address (right, below logo) ───────────────────────────────────
+  let sy = 30;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.setTextColor(30, 110, 65);
-  doc.text('Berechnungshinweis', ML + 5, y + 5);
-
+  doc.setFontSize(8);
+  doc.setTextColor(...BLACK);
+  doc.text(name, MR, sy, { align: 'right' }); sy += 4.5;
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(70, 78, 90);
-  const note =
-    `Der Netzbezug basiert auf der 15-Minuten-Messung des Smartmeters. ` +
-    `Der vZEV-Eigenverbrauch (${p.v.toFixed(1)} kWh, ${eigenPct}% des Gesamtverbrauchs) ist bereits abgezogen – ` +
-    `nur der verbleibende Netzbezug (${p.g.toFixed(1)} kWh) wird zum BKW-Tarif verrechnet. ` +
-    `Eigenverbrauchsquote vZEV: ${p.scRate.toFixed(1)}%  ·  Eigendeckungsgrad: ${p.ssRate.toFixed(1)}%.`;
-  doc.text(doc.splitTextToSize(note, W - 9), ML + 5, y + 10.5);
+  doc.setFontSize(8);
+  doc.setTextColor(...GRAY);
+  if (hdr.street)  { doc.text(hdr.street,  MR, sy, { align: 'right' }); sy += 4; }
+  if (hdr.city)    { doc.text(hdr.city,    MR, sy, { align: 'right' }); sy += 5; }
+  if (hdr.contact) { doc.text(hdr.contact, MR, sy, { align: 'right' }); sy += 4; }
+  sy += 2;
+  if (hdr.iban) { doc.text(`IBAN: ${hdr.iban}`, MR, sy, { align: 'right' }); sy += 4; }
 
-  // ── FOOTER ────────────────────────────────────────────────────────────────
-  const footY = PH - 18;
-  doc.setDrawColor(...border);
-  doc.setLineWidth(0.3);
-  doc.line(ML, footY, MR, footY);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(...lightText);
-  doc.text([hdr.name, hdr.city].filter(Boolean).join('  ·  '), ML, footY + 5);
-  doc.text(`Rechnungs-Nr. ${p.invNr}`, MR, footY + 5, { align: 'right' });
-
+  // ── Recipient address (left window area) ─────────────────────────────────
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
-  doc.setTextColor(...lightText);
-  doc.text('Berechnung vollständig im Browser  ·  github.com/matteotrachsel/vZEV', ML, footY + 9.5);
+  doc.setTextColor(...LGRAY);
+  doc.text([name, hdr.city].filter(Boolean).join(', '), ML, 46);
 
-  // thin bottom bar
-  doc.setFillColor(...blue);
-  doc.rect(0, PH - 3.5, PW, 3.5, 'F');
+  const firstM = meterData[0]?.m;
+  let ry = 54;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(...BLACK);
+  if (firstM?.label)   { doc.text(firstM.label,   ML, ry); ry += 5.5; }
+  if (firstM?.adresse) {
+    doc.setFontSize(9);
+    doc.setTextColor(...DGRAY);
+    const adressLines = doc.splitTextToSize(firstM.adresse, 80);
+    adressLines.forEach(l => { doc.text(l, ML, ry); ry += 4.5; });
+  }
+
+  // ── Meta info block ───────────────────────────────────────────────────────
+  const metaY = 80;
+  doc.setFillColor(...BLACK);
+  doc.rect(ML, metaY, 1, 13, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(...BLACK);
+  doc.text(`Rechnungsdatum: ${dateStr}`, ML + 4, metaY + 5);
+  doc.text(`Zahlbar bis: ${dueDateStr}`,  ML + 4, metaY + 10.5);
+
+  const mx = ML + 95;
+  const metaLabels = ['Bezugsstelle:', 'Produkt/Tarif:', 'Messpunkt:', 'Zählernummer:'];
+  metaLabels.forEach((lbl, i) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...BLACK);
+    doc.text(lbl, mx, metaY + 2 + i * 4);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...GRAY);
+    doc.text('Siehe Details', mx + 30, metaY + 2 + i * 4);
+  });
+
+  // ── "Rechnung" heading ────────────────────────────────────────────────────
+  const rechY = 108;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(20);
+  doc.setTextColor(...BLACK);
+  doc.text('Rechnung', ML, rechY);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(...GRAY);
+  doc.text(`für den Bezugszeitraum vom ${fmt(periodStart)} bis ${fmt(periodEnd)}`, ML, rechY + 6);
+
+  // ── Summary table ─────────────────────────────────────────────────────────
+  let ty = rechY + 14;
+  doc.setDrawColor(...BORDER);
+  doc.setLineWidth(0.4);
+  doc.line(ML, ty, MR, ty);
+
+  // Column label
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(...GRAY);
+  doc.text('Betrag', MR, ty - 1.5, { align: 'right' });
+  ty += 6;
+
+  // One line per meter
+  const grandTotal = meterData.reduce((s, d) => s + d.total, 0);
+  meterData.forEach(({ m, total }) => {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...BLACK);
+    doc.text(`${m.label || m.messpunktNr} gemäss Details`, ML, ty);
+    doc.text('CHF', MR - 30, ty);
+    doc.text(fmtCHF(total), MR, ty, { align: 'right' });
+    ty += 7;
+  });
+
+  // Divider + Gesamtbetrag
+  doc.setDrawColor(...BORDER);
+  doc.setLineWidth(0.35);
+  doc.line(ML, ty, MR, ty); ty += 6;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(...BLACK);
+  doc.text('Gesamtbetrag (gemäss Detailseiten)', ML, ty);
+  doc.text('CHF', MR - 30, ty);
+  doc.text(fmtCHF(grandTotal), MR, ty, { align: 'right' });
+  ty += 7;
+
+  // Zu bezahlender Betrag
+  doc.setDrawColor(...BORDER);
+  doc.line(ML, ty - 2, MR, ty - 2);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(...BLACK);
+  doc.text('Zu bezahlender Betrag', ML, ty + 4);
+  doc.text('CHF', MR - 30, ty + 4);
+  doc.text(fmtCHF(grandTotal), MR, ty + 4, { align: 'right' });
+  doc.setDrawColor(...BLACK);
+  doc.setLineWidth(0.6);
+  doc.line(ML, ty + 7, MR, ty + 7);
+
+  // ── Footer text ───────────────────────────────────────────────────────────
+  ty += 20;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(...BLACK);
+  doc.text('Freundliche Grüsse', ML, ty); ty += 5;
+  doc.text(name, ML, ty); ty += 10;
+  if (hdr.iban) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...GRAY);
+    doc.text(`IBAN: ${hdr.iban}    ·    Zahlbar bis: ${dueDateStr}`, ML, ty);
+  }
+
+  // ── Page number ───────────────────────────────────────────────────────────
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(...LGRAY);
+  doc.text(`Seite 1/${totalPages}`, MR, 285, { align: 'right' });
+}
+
+// ── Detail Page ───────────────────────────────────────────────────────────────
+
+function drawDetailPage(doc, { m, g, v, cons, fiKwh, eb, vz, grundtarifTotal, pvshareTotal, fiAmt, subtotal, total, tariff, mc, agg, periodStart, periodEnd, invNr, header, pageNum, totalPages }) {
+  const { ML, MR, BLACK, DGRAY, GRAY, LGRAY, BORDER } = INV;
+  const hdr = header || {};
+
+  // ── Detail header bar ─────────────────────────────────────────────────────
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(...BLACK);
+  doc.text('Details Ihrer Rechnung', ML, 16);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...GRAY);
+  doc.text(`Rechnungs-Nr.     ${invNr}`, MR, 16, { align: 'right' });
+  doc.setDrawColor(...BLACK);
+  doc.setLineWidth(0.5);
+  doc.line(ML, 19, MR, 19);
+
+  // ── Meter info ────────────────────────────────────────────────────────────
+  let y = 27;
+  const infoRows = [
+    { lbl: 'Bezugsstelle:', val: [m.label, m.adresse].filter(Boolean).join(', ') },
+    { lbl: 'Produkt/Tarif:', val: `Energy Blue – Einheitstarif ( ${fmt(periodStart)} – ${fmt(periodEnd)} )` },
+    { lbl: 'Messpunkt:', val: m.messpunktNr },
+  ];
+  if (m.zaehlerNr) infoRows.push({ lbl: 'Zählernummer:', val: m.zaehlerNr });
+
+  infoRows.forEach(({ lbl, val }) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...BLACK);
+    doc.text(lbl, ML, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...DGRAY);
+    const lines = doc.splitTextToSize(val, MR - ML - 26);
+    lines.forEach((l, i) => { doc.text(l, ML + 26, y + i * 4); });
+    y += Math.max(5, lines.length * 4);
+  });
+
+  // ── Messung section ───────────────────────────────────────────────────────
+  y += 3;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(...BLACK);
+  doc.text('Messung', ML, y); y += 2;
+  doc.setDrawColor(...BORDER);
+  doc.setLineWidth(0.4);
+  doc.line(ML, y, MR, y); y += 5;
+
+  const cZ = ML, cTar = ML + 22, cD1 = ML + 82, cD2 = ML + 104, cBez = MR;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(...GRAY);
+  doc.text('Zähler',      cZ,   y);
+  doc.text('Tarif',       cTar, y);
+  doc.text('Zeitperiode', cD1,  y);
+  doc.text('Bezug',       cBez, y, { align: 'right' });
+  y += 1.5;
+  doc.setDrawColor(...BORDER);
+  doc.line(ML, y, MR, y); y += 4.5;
+
+  const months = Object.keys(agg[m.messpunktNr] || {}).sort();
+  let totalCons = 0;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(...BLACK);
+  months.forEach((mk, i) => {
+    const d   = agg[m.messpunktNr][mk];
+    const kwh = d.cons || 0;
+    totalCons += kwh;
+    const [yr, mo] = mk.split('-').map(Number);
+    const d1str = `01.${String(mo).padStart(2,'0')}.${yr}`;
+    const last  = new Date(yr, mo, 0).getDate();
+    const d2str = `${last}.${String(mo).padStart(2,'0')}.${yr}`;
+    if (i === 0) {
+      doc.text(m.zaehlerNr || '–', cZ, y);
+      doc.text('Energie/Arbeit Einheitstarif (0 – 24 Uhr)', cTar, y);
+    }
+    doc.text(d1str,           cD1,  y);
+    doc.text(d2str,           cD2,  y);
+    doc.text(`${kwh.toFixed(0)} kWh`, cBez, y, { align: 'right' });
+    y += 5.5;
+  });
+
+  doc.setDrawColor(...BORDER);
+  doc.line(ML, y, MR, y); y += 4;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.text('Energie/Arbeit Total', cTar, y);
+  doc.text(`${totalCons.toFixed(0)} kWh`, cBez, y, { align: 'right' });
+  y += 9;
+
+  // ── Fakturierung section ──────────────────────────────────────────────────
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(...BLACK);
+  doc.text('Fakturierung', ML, y); y += 2;
+  doc.setDrawColor(...BORDER);
+  doc.setLineWidth(0.4);
+  doc.line(ML, y, MR, y); y += 5;
+
+  const fE = ML, fZP = ML + 62, fBez = ML + 106, fPr = ML + 133, fAmt = MR;
+
+  // Fakturierung header
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(...GRAY);
+  doc.text('Energie',     fE,   y);
+  doc.text('Zeitperiode', fZP,  y);
+  doc.text('Bezug',       fBez, y);
+  doc.text('Preis',       fPr,  y);
+  doc.text('Betrag in CHF', fAmt, y - 2.5, { align: 'right' });
+  doc.text('(ohne MWST)', fAmt, y + 1.5, { align: 'right' });
+  y += 1.5;
+  doc.setDrawColor(...BORDER);
+  doc.line(ML, y, MR, y); y += 5;
+
+  const pStr = `${fmt(periodStart)}-${fmt(periodEnd)}`;
+  const grundJahr = (tariff.grundtarif * 12).toFixed(2);
+  const dayCount  = Math.round((periodEnd - periodStart) / 864e5) + 1;
+
+  function fRow(label, zp, bez, preis, betrag, bold) {
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...BLACK);
+    doc.text(label, fE, y);
+    if (zp)    doc.text(zp,    fZP,  y);
+    if (bez)   doc.text(bez,   fBez, y);
+    if (preis) doc.text(preis, fPr,  y);
+    doc.text(betrag, fAmt, y, { align: 'right' });
+    y += 5.5;
+  }
+
+  fRow('Grundtarif',                pStr, `${dayCount} Tage`, `${grundJahr} CHF/a`,                      fmtCHF(grundtarifTotal));
+  fRow('Energie Einheitstarif',     pStr, `${g.toFixed(0)} kWh`, `${(tariff.energyAllIn*100).toFixed(2)} Rp.`, fmtCHF(eb));
+  fRow('vZEV-Eigenverbrauch Solar', pStr, `${v.toFixed(0)} kWh`, `${(tariff.vzevPrice*100).toFixed(2)} Rp.`,   fmtCHF(vz));
+
+  if (tariff.pvshareAbo > 0) {
+    fRow('PVshare Abo', pStr, `${mc} Mt.`, `${tariff.pvshareAbo.toFixed(2)} CHF/Mt.`, fmtCHF(pvshareTotal));
+  }
+
+  // Zwischentotal
+  doc.setDrawColor(...BORDER);
+  doc.line(ML, y - 2, MR, y - 2);
+  fRow('Zwischentotal', '', '', '', fmtCHF(subtotal), true);
+  y += 1;
+
+  // Feed-in
+  if (fiAmt > 0) {
+    fRow('Rückliefervergütung', pStr, `${fiKwh.toFixed(0)} kWh`, `${(tariff.feedIn*100).toFixed(2)} Rp.`, `- ${fmtCHF(fiAmt)}`);
+    doc.setDrawColor(...BORDER);
+    doc.line(ML, y - 2, MR, y - 2);
+    y += 2;
+  }
+
+  // Total ohne MWST
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(...BLACK);
+  doc.text('Total ohne MWST', fE, y);
+  doc.text(fmtCHF(total), fAmt, y, { align: 'right' });
+  y += 9;
+
+  // ── Zusammenzug ───────────────────────────────────────────────────────────
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.text('Zusammenzug Bezugsstelle', fE, y); y += 2;
+  doc.setDrawColor(...BORDER);
+  doc.line(ML, y, MR, y); y += 5;
+
+  doc.setFont('helvetica', 'normal');
+  doc.text('Total ohne MWST', fE, y);
+  doc.text(fmtCHF(total), fAmt, y, { align: 'right' }); y += 5.5;
+  doc.text('Betrag MWST', fE, y);
+  doc.text('0.00', fAmt, y, { align: 'right' }); y += 3;
+
+  doc.setDrawColor(...BORDER);
+  doc.line(ML, y, MR, y); y += 5;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Zu bezahlender Betrag aus Bezugsstelle', fE, y);
+  doc.text(fmtCHF(total), fAmt, y, { align: 'right' });
+  doc.setDrawColor(...BLACK);
+  doc.setLineWidth(0.5);
+  doc.line(fE + 95, y + 2.5, MR, y + 2.5);
+
+  // ── Footer ────────────────────────────────────────────────────────────────
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(...LGRAY);
+  doc.text(`Seite ${pageNum}/${totalPages}`, MR, 285, { align: 'right' });
+  doc.text(`Details Ihrer Rechnung  ·  Rechnungs-Nr. ${invNr}`, ML, 285);
 }

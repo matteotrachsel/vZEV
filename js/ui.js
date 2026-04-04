@@ -5,10 +5,12 @@
 document.addEventListener('DOMContentLoaded', () => {
   setupUpload();
   setupStaticHandlers();
+  syncVzevPrice();
 
   // Auto-recalculate when tariff inputs change (only if data is loaded).
   document.querySelectorAll('#feedInPrice,#pvshareAbo,#grundtarif,#energyAllIn,#vzevPrice')
     .forEach(el => el.addEventListener('change', () => {
+      syncVzevPrice();
       if (AppState.parsedData.length) calculateAndRender();
     }));
 
@@ -34,10 +36,6 @@ function setupStaticHandlers() {
   document.getElementById('calculateBtn').addEventListener('click', calculateAndRender);
   document.getElementById('exportBtn').addEventListener('click', exportCSV);
   document.getElementById('pdfBtn').addEventListener('click', exportPDF);
-  document.getElementById('tariffFileInput').addEventListener('change', function() {
-    if (this.files[0]) loadTariffFromJSON(this.files[0]);
-  });
-  document.getElementById('tariffSelect').addEventListener('change', applySelectedTariff);
 }
 
 // ── Wizard step indicator ─────────────────────────────────────────────────────
@@ -194,70 +192,22 @@ function getMeterConfig() {
   }).filter(m => m && m.typ !== 'ignore');
 }
 
+function syncVzevPrice() {
+  const energyEl = document.getElementById('energyAllIn');
+  const vzevEl   = document.getElementById('vzevPrice');
+  if (!energyEl || !vzevEl) return;
+  const energy = parseFloat(energyEl.value);
+  if (!isNaN(energy)) vzevEl.value = (energy * 0.8).toFixed(2);
+}
+
 function getTariff() {
   const energyAllIn = parseFloat(document.getElementById('energyAllIn').value) / 100;  // CHF/kWh all-in
-  const vzevPrice   = parseFloat(document.getElementById('vzevPrice').value)   / 100;  // CHF/kWh internal solar
-  const grundtarif  = parseFloat(document.getElementById('grundtarif').value);          // CHF/month per meter
+  const vzevPrice   = parseFloat(document.getElementById('vzevPrice').value)   / 100;  // CHF/kWh internal solar (80% of energyAllIn)
+  const grundtarif  = parseFloat(document.getElementById('grundtarif').value) / 12;    // CHF/Jahr → CHF/Monat
   const pvshareAbo  = parseFloat(document.getElementById('pvshareAbo').value);          // CHF/month per meter
   const feedIn      = parseFloat(document.getElementById('feedInPrice').value) / 100;  // CHF/kWh feed-in
   const splitBase   = document.getElementById('splitBase_prop')?.checked || false;
   return { energyAllIn, vzevPrice, grundtarif, pvshareAbo, feedIn, splitBase };
-}
-
-// ── BKW tariff JSON loader ────────────────────────────────────────────────────
-
-async function loadTariffFromJSON(file) {
-  const statusEl = document.getElementById('tariffFetchStatus');
-  statusEl.innerHTML = mkAlert('ai', `Lade <strong>${file.name}</strong>…`);
-  try {
-    const text = await file.text();
-    const data = JSON.parse(text);
-    AppState.tariffJSON = data;
-
-    const tariffs = (data.tariffs || []).filter(t => t.tariffType === 'electricity');
-    if (!tariffs.length) {
-      statusEl.innerHTML = mkAlert('aw', 'Keine Stromtarife in der Datei gefunden.');
-      return;
-    }
-
-    const sel = document.getElementById('tariffSelect');
-    sel.innerHTML = '<option value="">Tarif wählen…</option>' +
-      tariffs.map((t, i) => `<option value="${i}">${t.tariffName}</option>`).join('');
-    sel.style.display = '';
-    sel.value = '';
-
-    const dso = data.dsoName || file.name;
-    statusEl.innerHTML = mkAlert('as',
-      `<strong>${dso}</strong> geladen · ${tariffs.length} Tarife verfügbar · Tarif rechts wählen`
-    );
-  } catch (e) {
-    statusEl.innerHTML = mkAlert('ae', `Fehler beim Laden der Tarifdatei: ${e.message}`);
-  }
-}
-
-function applySelectedTariff() {
-  const statusEl = document.getElementById('tariffFetchStatus');
-  const sel   = document.getElementById('tariffSelect');
-  const idx   = parseInt(sel.value, 10);
-  if (isNaN(idx) || !AppState.tariffJSON) return;
-
-  const tariff = (AppState.tariffJSON.tariffs || []).filter(t => t.tariffType === 'electricity')[idx];
-  if (!tariff) return;
-
-  const basePrice    = tariff.prices?.base?.price;
-  const energyPrices = tariff.prices?.energy || [];
-  // For multilevel (HT/NT), use the daytime (HT) price (from 07:00); fallback to first.
-  const htEntry = energyPrices.find(e => e.from === '07:00') || energyPrices[0];
-  const energyPrice = htEntry?.price; // CHF/kWh
-
-  if (basePrice != null) document.getElementById('grundtarif').value = basePrice.toFixed(2);
-
-  const parts = [`Tarif <strong>${tariff.tariffName}</strong>`];
-  if (basePrice   != null) parts.push(`Grundtarif: ${basePrice.toFixed(2)} CHF/Mt.`);
-  if (energyPrice != null) parts.push(`Energiepreis (BKW): ${(energyPrice * 100).toFixed(2)} Rp/kWh`);
-  statusEl.innerHTML = mkAlert('as', parts.join(' · '));
-
-  if (AppState.parsedData.length) calculateAndRender();
 }
 
 // ── Invoice header config ─────────────────────────────────────────────────────

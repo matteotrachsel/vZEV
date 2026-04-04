@@ -133,37 +133,21 @@
     <span class="section-num">Schritt 3</span>
     <div>
       <div class="section-title">Tarif-Konfiguration</div>
-      <div class="section-desc">Aktuelle Tarifdaten 2026 · alle Werte anpassbar</div>
+      <div class="section-desc">BKW Energy Blue 2026 · Festwerte hinterlegt · alle Werte anpassbar</div>
     </div>
   </div>
 
   <div class="card">
-    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:.75rem;margin-bottom:1.25rem">
-      <label class="btn btn-outline btn-sm" style="cursor:pointer">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 2v7M6.5 2L4 4.5M6.5 2L9 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 10.5h9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-        BKW Tarifdatei laden (.json)
-        <input type="file" id="tariffFileInput" accept=".json" style="display:none">
-      </label>
-      <select id="tariffSelect" class="btn btn-outline btn-sm" style="display:none;cursor:pointer;font-weight:600">
-        <option value="">Tarif wählen…</option>
-      </select>
-    </div>
-    <div id="tariffFetchStatus" style="margin-bottom:.75rem"></div>
     <div class="tariff-grid">
       <div class="tfield">
-        <label>Einspeisevergütung BKW 2026</label>
-        <input type="number" id="feedInPrice" value="8.00" step="0.01" min="0">
-        <div class="suffix">Rp/kWh · Netzeinspeisung <span style="color:var(--amber);font-weight:700">· bitte prüfen</span></div>
+        <label>Energy Blue Einheitstarif 2026 (0–24h)</label>
+        <input type="number" id="energyAllIn" value="23.18" step="0.01" min="0">
+        <div class="suffix">Rp/kWh · inkl. MWSt.</div>
       </div>
       <div class="tfield">
-        <label>PVshare Abo</label>
-        <input type="number" id="pvshareAbo" value="5.00" step="0.01" min="0">
-        <div class="suffix">CHF/Monat pro Stromzähler <span style="color:var(--amber);font-weight:700">· bitte prüfen</span></div>
-      </div>
-      <div class="tfield">
-        <label>Grundtarif BKW</label>
-        <input type="number" id="grundtarif" value="3.25" step="0.01" min="0">
-        <div class="suffix">CHF/Monat pro Stromzähler</div>
+        <label>Grundtarif BKW 2026</label>
+        <input type="number" id="grundtarif" value="231.33" step="0.01" min="0">
+        <div class="suffix">CHF/Jahr pro Messtelle inkl. MWSt.</div>
         <div style="margin-top:.55rem;display:flex;gap:.5rem;flex-wrap:wrap">
           <label style="display:flex;align-items:center;gap:.35rem;font-size:.73rem;font-weight:600;color:var(--text-mid);cursor:pointer">
             <input type="radio" name="splitBase" id="splitBase_each" value="each" checked style="accent-color:var(--blue)"> Pro Zähler
@@ -174,18 +158,23 @@
         </div>
       </div>
       <div class="tfield">
-        <label>Energiebezug BKW 2026</label>
-        <input type="number" id="energyAllIn" value="19.52" step="0.01" min="0">
-        <div class="suffix">Rp/kWh · inkl. Netznutzung &amp; Abgaben <span style="color:var(--amber);font-weight:700">· bitte prüfen</span></div>
+        <label>Rückliefervergütung BKW</label>
+        <input type="number" id="feedInPrice" value="9.00" step="0.01" min="0">
+        <div class="suffix">Rp/kWh · wird quartalsweise publiziert <span style="color:var(--amber);font-weight:700">· ggf. anpassen</span></div>
       </div>
       <div class="tfield">
-        <label>vZEV Energiepreis</label>
-        <input type="number" id="vzevPrice" value="12.00" step="0.01" min="0">
-        <div class="suffix">Rp/kWh · interne PV-Vergütung <span style="color:var(--amber);font-weight:700">· bitte prüfen</span></div>
+        <label>PVshare Abo</label>
+        <input type="number" id="pvshareAbo" value="5.00" step="0.01" min="0">
+        <div class="suffix">CHF/Monat pro Stromzähler</div>
+      </div>
+      <div class="tfield">
+        <label>vZEV Energiepreis <span style="font-size:.7rem;color:var(--text-muted);font-weight:500">(= 80% Einheitstarif)</span></label>
+        <input type="number" id="vzevPrice" value="18.54" step="0.01" min="0" readonly style="background:var(--bg);color:var(--text-muted)">
+        <div class="suffix">Rp/kWh · interne PV-Vergütung · wird automatisch berechnet</div>
       </div>
     </div>
     <p style="margin-top:1rem;font-size:.73rem;color:var(--text-muted);font-weight:500">
-      Tarifdaten gemäss BKW Energy Blue 2026 und PVshare-Vertrag. Alle Werte vor der ersten Auswertung prüfen und anpassen.
+      Festwerte gemäss BKW Energy Blue 2026. Die Rückliefervergütung wird erst nach dem Quartal publiziert – bitte jeweils aktualisieren.
     </p>
   </div>
 </div>
@@ -231,15 +220,16 @@
 
 <!-- SECTION 4: Methodology -->
 <div class="section">
-  <div class="section-head">
+  <div class="section-head" onclick="toggleMethodik()" style="cursor:pointer;user-select:none">
     <span class="section-num" style="background:#F0F4F9;color:var(--text-mid)">Methodik</span>
-    <div>
+    <div style="flex:1">
       <div class="section-title">Berechnungsmethode &amp; Transparenz</div>
       <div class="section-desc">So wird der Solarstrom-Anteil jedes Messpunkts berechnet</div>
     </div>
+    <span id="methodikChevron" style="font-size:1rem;color:var(--text-muted);transition:transform .2s;display:inline-block;transform:rotate(-90deg)">▼</span>
   </div>
 
-  <div class="card">
+  <div class="card" id="methodikCard" style="display:none">
 
     <!-- Overview -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.75rem">
@@ -480,5 +470,14 @@
 <script src="js/renderer.js"></script>
 <script src="js/export.js"></script>
 <script src="js/invoice.js"></script>
+<script>
+function toggleMethodik() {
+  const card = document.getElementById('methodikCard');
+  const chevron = document.getElementById('methodikChevron');
+  const open = card.style.display !== 'none';
+  card.style.display = open ? 'none' : '';
+  chevron.style.transform = open ? 'rotate(-90deg)' : 'rotate(0deg)';
+}
+</script>
 </body>
 </html>

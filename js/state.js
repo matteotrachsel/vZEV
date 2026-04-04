@@ -4,7 +4,6 @@
 const AppState = {
   parsedData:  [],   // array of { messpunkt, datum, bezug, einspeisung }
   detectedMPs: [],   // array of unique messpunktNr strings from the uploaded file
-  tariffJSON:  null, // parsed BKW tariff JSON (loaded by user)
   charts: {
     monthly:    null,   // Chart.js instance – monthly bar chart
     pie:        null,   // Chart.js instance – energy distribution pie
