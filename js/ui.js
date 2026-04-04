@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
   syncVzevPrice();
 
   // Auto-recalculate when tariff inputs change (only if data is loaded).
-  document.querySelectorAll('#feedInPrice,#pvshareAbo,#grundtarif,#energyAllIn,#vzevPrice')
+  document.querySelectorAll('#feedInPrice,#grundtarif,#energyAllIn,#vzevPrice')
     .forEach(el => el.addEventListener('change', () => {
       syncVzevPrice();
       if (AppState.parsedData.length) calculateAndRender();
@@ -204,10 +204,9 @@ function getTariff() {
   const energyAllIn = parseFloat(document.getElementById('energyAllIn').value) / 100;  // CHF/kWh all-in
   const vzevPrice   = parseFloat(document.getElementById('vzevPrice').value)   / 100;  // CHF/kWh internal solar (80% of energyAllIn)
   const grundtarif  = parseFloat(document.getElementById('grundtarif').value) / 12;    // CHF/Jahr → CHF/Monat
-  const pvshareAbo  = parseFloat(document.getElementById('pvshareAbo').value);          // CHF/month per meter
   const feedIn      = parseFloat(document.getElementById('feedInPrice').value) / 100;  // CHF/kWh feed-in
   const splitBase   = document.getElementById('splitBase_prop')?.checked || false;
-  return { energyAllIn, vzevPrice, grundtarif, pvshareAbo, feedIn, splitBase };
+  return { energyAllIn, vzevPrice, grundtarif, pvshareAbo: 0, feedIn, splitBase };
 }
 
 // ── Invoice header config ─────────────────────────────────────────────────────
