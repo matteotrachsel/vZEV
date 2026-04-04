@@ -419,27 +419,6 @@ main {
 }
 .mp-delete-btn:hover { background: var(--red-light); color: var(--red); }
 
-.prio-toggle {
-  display: flex;
-  align-items: center;
-  gap: .6rem;
-  margin-top: .65rem;
-  padding: .55rem .75rem;
-  border-radius: var(--radius);
-  border: 1.5px solid var(--border);
-  background: var(--surface);
-  cursor: pointer;
-  transition: var(--transition);
-  font-size: .78rem;
-  font-weight: 600;
-  color: var(--text-mid);
-  user-select: none;
-  width: 100%;
-}
-.prio-toggle.active { border-color: #E6900A; background: #FFFBF2; color: #8A4F00; }
-.prio-toggle input[type=checkbox] { accent-color: #E6900A; width: 14px; height: 14px; cursor: pointer; flex-shrink: 0; }
-.badge-priority { background: #FEF3DC; color: #8A4F00; }
-.meter-cfg-card.is-priority { border-color: #E6900A; }
 
 /* ── SUMMARY TILES ──────────────────────────────────────────────────────── */
 .sum-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 1px; margin-bottom: 1.5rem; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }

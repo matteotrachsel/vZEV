@@ -35,7 +35,7 @@ function renderMonthly(monthly, tariff, nV) {
     const eigen = d.cons > 0 ? (d.vzev / d.cons) * 100 : 0;
     const eb   = d.grid * tariff.energyAllIn;           // Energiebezug cost
     const vz   = d.vzev * tariff.vzevPrice;             // vZEV solar cost
-    const fee  = nV * (tariff.grundtarif + tariff.pvshareAbo); // monthly fees (all meters)
+    const fee  = nV * tariff.grundtarif; // monthly fees (all meters)
     const fi   = d.fi * tariff.feedIn;                  // feed-in revenue
     const total = eb + vz + fee - fi;
     sC+=d.cons; sP+=d.prod; sV+=d.vzev; sG+=d.grid;
@@ -135,8 +135,7 @@ function renderCosts(agg, meters, tariff) {
     Object.values(agg[m.messpunktNr] || {}).forEach(d => { v += d.vzev; });
     return v;
   });
-  const totalGrid = meterGrid.reduce((s, g) => s + g, 0);
-  const totalFee  = mc * (tariff.grundtarif + tariff.pvshareAbo);
+  const totalFee = mc * tariff.grundtarif;
 
   let aG = 0, aV = 0, aT = 0;
   const rows = cM.map((m, i) => {
@@ -144,9 +143,7 @@ function renderCosts(agg, meters, tariff) {
     const v   = meterVzev[i];
     const eb  = g * tariff.energyAllIn;
     const vz  = v * tariff.vzevPrice;
-    const fee = tariff.splitBase
-      ? (totalGrid > 0 ? (g / totalGrid) * cM.length * totalFee : totalFee)
-      : totalFee;
+    const fee = totalFee;
     const total = eb + vz + fee;
     aG += g; aV += v; aT += total;
     return `<tr>

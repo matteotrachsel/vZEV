@@ -112,7 +112,6 @@ function buildMeterConfig() {
   grid.innerHTML = AppState.detectedMPs.map((mp, i) => {
     const known    = KNOWN.find(k => k.messpunktNr === mp || mp.includes(k.messpunktNr) || k.messpunktNr.includes(mp));
     const typ      = known?.typ      || 'Verbrauch';
-    const isPrio   = known?.priority || false;
     const label    = known?.label    || '';
     const adresse  = known?.adresse  || '';
     const zaehlerNr = known?.zaehlerNr || '';
@@ -205,8 +204,7 @@ function getTariff() {
   const vzevPrice   = parseFloat(document.getElementById('vzevPrice').value)   / 100;  // CHF/kWh internal solar (80% of energyAllIn)
   const grundtarif  = parseFloat(document.getElementById('grundtarif').value) / 12;    // CHF/Jahr → CHF/Monat
   const feedIn      = parseFloat(document.getElementById('feedInPrice').value) / 100;  // CHF/kWh feed-in
-  const splitBase   = document.getElementById('splitBase_prop')?.checked || false;
-  return { energyAllIn, vzevPrice, grundtarif, pvshareAbo: 0, feedIn, splitBase };
+  return { energyAllIn, vzevPrice, grundtarif, feedIn };
 }
 
 // ── Invoice header config ─────────────────────────────────────────────────────

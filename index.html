@@ -150,14 +150,6 @@
         <label>Grundtarif BKW 2026</label>
         <input type="number" id="grundtarif" value="231.33" step="0.01" min="0">
         <div class="suffix">CHF/Jahr pro Messtelle inkl. MWSt.</div>
-        <div style="margin-top:.55rem;display:flex;gap:.5rem;flex-wrap:wrap">
-          <label style="display:flex;align-items:center;gap:.35rem;font-size:.73rem;font-weight:600;color:var(--text-mid);cursor:pointer">
-            <input type="radio" name="splitBase" id="splitBase_each" value="each" checked style="accent-color:var(--blue)"> Pro Zähler
-          </label>
-          <label style="display:flex;align-items:center;gap:.35rem;font-size:.73rem;font-weight:600;color:var(--text-mid);cursor:pointer">
-            <input type="radio" name="splitBase" id="splitBase_prop" value="prop" style="accent-color:var(--blue)"> Geteilt (proportional)
-          </label>
-        </div>
       </div>
       <div class="tfield">
         <label>Rückliefervergütung BKW</label>
@@ -233,9 +225,7 @@
       <div>
         <div class="card-head" style="border:none;padding:0;margin-bottom:.75rem">Verteilungsmethode</div>
         <p style="font-size:.83rem;color:var(--text-mid);font-weight:500;line-height:1.7">
-          Es gibt zwei Modi, wählbar pro Messpunkt in Schritt 2:<br><br>
-          <strong>Proportional (Standard):</strong> Der Solarstrom wird in jedem 15-Minuten-Intervall proportional zum Verbrauch aufgeteilt. Wer gerade mehr verbraucht, bekommt mehr Solar. Die Aufteilung ist <em>nicht fix</em> und schwankt laufend.<br><br>
-          <strong>☀ PV-Priorität:</strong> Der PV-Eigentümer verbraucht den Solarstrom zuerst bis zu seinem eigenen Bedarf. Nur der Überschuss wird anteilig an die anderen Teilnehmer verteilt. Erst wenn auch der Überschuss grösser ist als der Gesamtverbrauch aller, fliesst Strom ins Netz zurück.
+          <strong>Proportional:</strong> Der Solarstrom wird in jedem 15-Minuten-Intervall proportional zum Verbrauch aufgeteilt. Wer gerade mehr verbraucht, bekommt mehr Solar. Die Aufteilung ist <em>nicht fix</em> und schwankt laufend je nach aktuellem Verbrauchsverhalten der Teilnehmer.
         </p>
       </div>
       <div>
@@ -288,14 +278,10 @@
 
       <div style="background:var(--surface);padding:1.1rem 1.25rem">
         <div style="font-size:.68rem;font-weight:800;color:var(--blue);letter-spacing:.07em;text-transform:uppercase;margin-bottom:.5rem">⑤ Anteil je Zähler</div>
-        <div style="font-family:monospace;font-size:.82rem;color:var(--text);background:var(--bg);padding:.6rem .75rem;border-radius:var(--radius);margin-bottom:.5rem;line-height:2">
-          <span style="color:#8A4F00;font-weight:700">Priorität:</span><br>
-          V<sub style="font-size:.7rem">prio</sub> = min(P(t), C<sub style="font-size:.7rem">prio</sub>)<br>
-          P<sub style="font-size:.7rem">rest</sub> = max(0, P(t) − C<sub style="font-size:.7rem">prio</sub>)<br>
-          <span style="color:var(--blue);font-weight:700">Normal:</span><br>
-          Vᵢ(t) = Cᵢ / ΣC<sub style="font-size:.7rem">norm</sub> × min(P<sub style="font-size:.7rem">rest</sub>, ΣC<sub style="font-size:.7rem">norm</sub>)
+        <div style="font-family:monospace;font-size:.85rem;color:var(--text);background:var(--bg);padding:.6rem .75rem;border-radius:var(--radius);margin-bottom:.5rem;line-height:1.8">
+          Vᵢ(t) = Cᵢ(t) / ΣC(t) × SC(t)
         </div>
-        <p style="font-size:.75rem;color:var(--text-muted);font-weight:500">PV-Eigentümer bekommt zuerst, Überschuss geht proportional an die anderen.</p>
+        <p style="font-size:.75rem;color:var(--text-muted);font-weight:500">Proportionaler Anteil am Selbstverbrauch, gewichtet nach aktuellem Verbrauch.</p>
       </div>
 
       <div style="background:var(--surface);padding:1.1rem 1.25rem">

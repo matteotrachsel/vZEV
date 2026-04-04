@@ -29,13 +29,12 @@ function exportPDF() {
       fiKwh += (d.fi || 0);
     });
     const grundtarifTotal = mc * tariff.grundtarif;
-    const pvshareTotal    = mc * tariff.pvshareAbo;
     const eb     = g    * tariff.energyAllIn;
     const vz     = v    * tariff.vzevPrice;
     const fiAmt  = fiKwh * tariff.feedIn;
-    const subtotal = grundtarifTotal + pvshareTotal + eb + vz;
+    const subtotal = grundtarifTotal + eb + vz;
     const total    = subtotal - fiAmt;
-    return { m, g, v, cons, fiKwh, eb, vz, grundtarifTotal, pvshareTotal, fiAmt, subtotal, total };
+    return { m, g, v, cons, fiKwh, eb, vz, grundtarifTotal, fiAmt, subtotal, total };
   });
 
   const totalPages = meterData.length + 1;
@@ -219,7 +218,7 @@ function drawCoverPage(doc, { header, dateStr, dueDateStr, periodStr, invNr, met
 
 // ── Detail Page ───────────────────────────────────────────────────────────────
 
-function drawDetailPage(doc, { m, g, v, cons, fiKwh, eb, vz, grundtarifTotal, pvshareTotal, fiAmt, subtotal, total, tariff, mc, agg, periodStart, periodEnd, invNr, header, pageNum, totalPages }) {
+function drawDetailPage(doc, { m, g, v, cons, fiKwh, eb, vz, grundtarifTotal, fiAmt, subtotal, total, tariff, mc, agg, periodStart, periodEnd, invNr, header, pageNum, totalPages }) {
   const { ML, MR, BLACK, DGRAY, GRAY, LGRAY, BORDER } = INV;
   const hdr = header || {};
 
@@ -354,10 +353,6 @@ function drawDetailPage(doc, { m, g, v, cons, fiKwh, eb, vz, grundtarifTotal, pv
   fRow('Grundtarif',                pStr, `${dayCount} Tage`, `${grundJahr} CHF/a`,                      fmtCHF(grundtarifTotal));
   fRow('Energie Einheitstarif',     pStr, `${g.toFixed(0)} kWh`, `${(tariff.energyAllIn*100).toFixed(2)} Rp.`, fmtCHF(eb));
   fRow('vZEV-Eigenverbrauch Solar', pStr, `${v.toFixed(0)} kWh`, `${(tariff.vzevPrice*100).toFixed(2)} Rp.`,   fmtCHF(vz));
-
-  if (tariff.pvshareAbo > 0) {
-    fRow('PVshare Abo', pStr, `${mc} Mt.`, `${tariff.pvshareAbo.toFixed(2)} CHF/Mt.`, fmtCHF(pvshareTotal));
-  }
 
   // Zwischentotal
   doc.setDrawColor(...BORDER);
