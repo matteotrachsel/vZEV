@@ -328,8 +328,7 @@ function drawDetailPage(doc, { m, g, v, cons, fiKwh, eb, vz, grundtarifTotal, fi
   doc.text('Zeitperiode', fZP,  y);
   doc.text('Bezug',       fBez, y);
   doc.text('Preis',       fPr,  y);
-  doc.text('Betrag in CHF', fAmt, y - 2.5, { align: 'right' });
-  doc.text('(ohne MWST)', fAmt, y + 1.5, { align: 'right' });
+  doc.text('Betrag in CHF', fAmt, y, { align: 'right' });
   y += 1.5;
   doc.setDrawColor(...BORDER);
   doc.line(ML, y, MR, y); y += 5;
@@ -368,11 +367,11 @@ function drawDetailPage(doc, { m, g, v, cons, fiKwh, eb, vz, grundtarifTotal, fi
     y += 2;
   }
 
-  // Total ohne MWST
+  // Total
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(...BLACK);
-  doc.text('Total ohne MWST', fE, y);
+  doc.text('Total inkl. MWSt.', fE, y);
   doc.text(fmtCHF(total), fAmt, y, { align: 'right' });
   y += 9;
 
@@ -384,10 +383,8 @@ function drawDetailPage(doc, { m, g, v, cons, fiKwh, eb, vz, grundtarifTotal, fi
   doc.line(ML, y, MR, y); y += 5;
 
   doc.setFont('helvetica', 'normal');
-  doc.text('Total ohne MWST', fE, y);
-  doc.text(fmtCHF(total), fAmt, y, { align: 'right' }); y += 5.5;
-  doc.text('Betrag MWST', fE, y);
-  doc.text('0.00', fAmt, y, { align: 'right' }); y += 3;
+  doc.text('Total inkl. MWSt.', fE, y);
+  doc.text(fmtCHF(total), fAmt, y, { align: 'right' }); y += 3;
 
   doc.setDrawColor(...BORDER);
   doc.line(ML, y, MR, y); y += 5;
