@@ -10,6 +10,8 @@
 <link rel="stylesheet" href="css/main.css">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 </head>
@@ -413,6 +415,21 @@
       Durchschnittlicher Tagesverlauf über alle Messpunkte. Jeder Wert zeigt den mittleren Energiefluss im entsprechenden 15-Minuten-Intervall gemittelt über alle erfassten Tage.
     </p>
     <canvas id="chartDayProfile" style="max-height:300px"></canvas>
+  </div>
+
+  <!-- Timeline chart -->
+  <div class="card" style="margin-bottom:1.5rem">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+      <div class="card-head" style="margin:0">Zeitreihe · alle Tage · 15-Minuten-Auflösung</div>
+      <button id="timelineResetBtn" class="btn btn-outline btn-sm" title="Zoom zurücksetzen">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5a4.5 4.5 0 1 1 1.1 2.9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M2 10.5V7.5h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Zoom zurücksetzen
+      </button>
+    </div>
+    <p style="font-size:.78rem;color:var(--text-muted);font-weight:500;margin-bottom:1rem">
+      Vollständige Zeitreihe aller Messpunkte. <strong>Scrollen</strong> zum Zoomen, <strong>Ziehen</strong> zum Verschieben – so lassen sich einzelne Tage oder Stunden isoliert betrachten.
+    </p>
+    <canvas id="chartTimeline" style="max-height:350px"></canvas>
   </div>
 
   <!-- Distribution chart -->

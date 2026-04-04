@@ -304,6 +304,111 @@ function renderMethodologyExample(byTS, consMeters, prodMeters) {
   if (ph) ph.textContent = '· Intervall mit höchstem Eigenverbrauch aus den hochgeladenen Daten';
 }
 
+// ── TIMELINE CHART ────────────────────────────────────────────────────────────
+// Continuous 15-min time series for every day with zoom/pan via chartjs-plugin-zoom.
+
+function renderTimeline(byTS, meters) {
+  if (AppState.charts.timeline) AppState.charts.timeline.destroy();
+
+  const COLORS = ['#0046B0', '#3AAA6A', '#7C5CBF', '#E6900A', '#C0392B', '#0891B2'];
+
+  // Sort all timestamps chronologically
+  const sortedTS = Object.keys(byTS).map(Number).sort((a, b) => a - b);
+
+  // Build one dataset per meter
+  const datasets = meters.map((m, i) => {
+    const isP  = m.typ === 'Produktion';
+    const color = COLORS[i % COLORS.length];
+    const data = sortedTS.map(ts => {
+      const slot = byTS[String(ts)]?.[m.messpunktNr];
+      if (!slot) return null;
+      return isP ? Math.max(slot.bezug, slot.einspeisung) : (slot.bezug || 0);
+    });
+    return {
+      label:           (m.label || m.messpunktNr.slice(-8)) + (isP ? ' ☀' : ''),
+      data,
+      borderColor:     color,
+      backgroundColor: color + '20',
+      borderWidth:     isP ? 1.5 : 1,
+      borderDash:      isP ? [4, 3] : [],
+      pointRadius:     0,
+      spanGaps:        false,
+      tension:         0,
+      fill:            false,
+    };
+  });
+
+  // X-axis labels: ISO strings (Chart.js uses them as categories)
+  const labels = sortedTS.map(ts => new Date(ts));
+
+  AppState.charts.timeline = new Chart(document.getElementById('chartTimeline'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { font: { size: 11, weight: '600' }, boxWidth: 12, boxHeight: 2 }
+        },
+        tooltip: {
+          callbacks: {
+            title: ctx => {
+              const d = ctx[0]?.parsed?.x != null
+                ? new Date(labels[ctx[0].dataIndex])
+                : null;
+              if (!d) return '';
+              return d.toLocaleString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+            },
+            label: ctx => ` ${ctx.dataset.label}: ${(ctx.parsed.y ?? 0).toFixed(3)} kWh`
+          }
+        },
+        zoom: {
+          pan:  { enabled: true, mode: 'x' },
+          zoom: {
+            wheel:  { enabled: true },
+            pinch:  { enabled: true },
+            mode:   'x',
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'category',
+          grid: { display: false },
+          ticks: {
+            font:         { size: 10 },
+            maxRotation:  0,
+            autoSkip:     true,
+            maxTicksLimit: 12,
+            callback(val, idx) {
+              const d = labels[idx];
+              if (!d) return '';
+              // Show day label only at midnight (00:00)
+              if (d.getHours() === 0 && d.getMinutes() === 0) {
+                return d.toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit' });
+              }
+              return '';
+            }
+          }
+        },
+        y: {
+          grid:   { color: '#EBF1FB', lineWidth: 1 },
+          border: { display: false },
+          ticks:  { font: { size: 11 }, callback: v => v.toFixed(2) + ' kWh' }
+        }
+      }
+    }
+  });
+
+  // Reset button
+  document.getElementById('timelineResetBtn')?.addEventListener('click', () => {
+    AppState.charts.timeline?.resetZoom();
+  });
+}
+
 // ── DAY PROFILE CHART ─────────────────────────────────────────────────────────
 // Builds the average 15-min load profile (00:00–23:45) for each meter.
 

@@ -99,6 +99,7 @@ function calculateAndRender() {
   renderCosts(agg, meters, tariff);
   renderCharts(monthly, consMeters, agg);
   renderDayProfile(byTS, meters);
+  renderTimeline(byTS, meters);
   renderMethodologyExample(byTS, consMeters, prodMeters);
 
   document.getElementById('results').classList.remove('hidden');
