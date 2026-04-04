@@ -432,6 +432,39 @@
     <canvas id="chartTimeline" style="max-height:350px"></canvas>
   </div>
 
+  <!-- Optimisation section -->
+  <div class="section-head" style="margin-top:2rem;margin-bottom:1rem">
+    <span class="section-num" style="background:var(--green-light);color:var(--green)">Optimierung</span>
+    <div>
+      <div class="section-title">Eigenverbrauch optimieren</div>
+      <div class="section-desc">Wann lohnt es sich am meisten, Verbrauch in die Sonnenstunden zu verschieben?</div>
+    </div>
+  </div>
+
+  <!-- Top recommendations -->
+  <div id="optRecommendations" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1.5rem"></div>
+
+  <!-- Heatmap + hourly chart side by side -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
+    <div class="card">
+      <div class="card-head" style="margin-bottom:.75rem">Ø Überschuss nach Stunde &amp; Wochentag</div>
+      <p style="font-size:.75rem;color:var(--text-muted);font-weight:500;margin-bottom:.75rem">Dunkelgrün = viel Überschuss · Grau = kein Überschuss</p>
+      <div id="optHeatmap" style="overflow-x:auto"></div>
+    </div>
+    <div class="card">
+      <div class="card-head" style="margin-bottom:.75rem">Ø Überschuss nach Tageszeit</div>
+      <p style="font-size:.75rem;color:var(--text-muted);font-weight:500;margin-bottom:.75rem">Durchschnittlicher Netto-Überschuss pro Stunde über alle erfassten Tage</p>
+      <canvas id="chartSurplusHour" style="max-height:220px"></canvas>
+    </div>
+  </div>
+
+  <!-- Weekday comparison -->
+  <div class="card" style="margin-bottom:1.5rem">
+    <div class="card-head" style="margin-bottom:.75rem">Ø Überschuss nach Wochentag</div>
+    <p style="font-size:.75rem;color:var(--text-muted);font-weight:500;margin-bottom:.75rem">An welchen Wochentagen steht im Durchschnitt am meisten Solarüberschuss zur Verfügung?</p>
+    <canvas id="chartSurplusWeekday" style="max-height:180px"></canvas>
+  </div>
+
   <!-- Distribution chart -->
   <div class="card" style="margin-bottom:1.5rem">
     <div class="card-head">Solar-Zuteilung pro Monat · nicht fix 50/50</div>

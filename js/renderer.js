@@ -304,6 +304,191 @@ function renderMethodologyExample(byTS, consMeters, prodMeters) {
   if (ph) ph.textContent = '· Intervall mit höchstem Eigenverbrauch aus den hochgeladenen Daten';
 }
 
+// ── OPTIMISATION SECTION ──────────────────────────────────────────────────────
+// Analyses when surplus is highest to recommend best times to shift consumption.
+
+function renderOptimisation(byTS, meters) {
+  if (AppState.charts.surplusHour)    AppState.charts.surplusHour.destroy();
+  if (AppState.charts.surplusWeekday) AppState.charts.surplusWeekday.destroy();
+
+  const prodMeters = meters.filter(m => m.typ === 'Produktion');
+  const consMeters = meters.filter(m => m.typ === 'Verbrauch');
+
+  // Accumulate surplus per (hour, weekday) and per (hour), (weekday)
+  // surplus = max(0, totalProd - totalCons) for each 15-min slot
+  // heatmap[weekday 0-6][hour 0-23] = { sum, count }
+  const heatmap  = Array.from({ length: 7  }, () => Array.from({ length: 24 }, () => ({ sum: 0, n: 0 })));
+  const byHour   = Array.from({ length: 24 }, () => ({ sum: 0, n: 0 }));
+  const byWday   = Array.from({ length: 7  }, () => ({ sum: 0, n: 0 }));
+
+  Object.entries(byTS).forEach(([ts, slots]) => {
+    const d    = new Date(parseInt(ts, 10));
+    const h    = d.getHours();
+    const wday = (d.getDay() + 6) % 7; // 0=Mo … 6=So
+
+    const prod = prodMeters.reduce((s, m) => {
+      const sl = slots[m.messpunktNr];
+      return s + (sl ? Math.max(sl.bezug, sl.einspeisung) : 0);
+    }, 0);
+    const cons = consMeters.reduce((s, m) => {
+      return s + (slots[m.messpunktNr]?.bezug || 0);
+    }, 0);
+    const surplus = Math.max(0, prod - cons);
+
+    heatmap[wday][h].sum += surplus;
+    heatmap[wday][h].n   += 1;
+    byHour[h].sum  += surplus;
+    byHour[h].n    += 1;
+    byWday[wday].sum += surplus;
+    byWday[wday].n   += 1;
+  });
+
+  const avgHour  = byHour.map(x  => x.n  > 0 ? x.sum  / x.n  : 0);
+  const avgWday  = byWday.map(x  => x.n  > 0 ? x.sum  / x.n  : 0);
+  const avgHeatmap = heatmap.map(row => row.map(x => x.n > 0 ? x.sum / x.n : 0));
+
+  const maxSurplus = Math.max(...avgHour);
+
+  // ── Top recommendations ─────────────────────────────────────────────────────
+  // Find contiguous peak windows (top hours)
+  const threshold = maxSurplus * 0.5;
+  const peakHours = avgHour.map((v, h) => ({ h, v })).filter(x => x.v >= threshold).sort((a, b) => b.v - a.v);
+
+  // Cluster consecutive hours
+  const clusters = [];
+  const usedHours = new Set();
+  peakHours.forEach(({ h }) => {
+    if (usedHours.has(h)) return;
+    let start = h, end = h;
+    while (avgHour[(end + 1) % 24] >= threshold && end - start < 5) { end++; usedHours.add(end); }
+    usedHours.add(start);
+    clusters.push({ start, end, avg: avgHour.slice(start, end + 1).reduce((s, v) => s + v, 0) / (end - start + 1) });
+  });
+  clusters.sort((a, b) => b.avg - a.avg);
+  const top3 = clusters.slice(0, 3);
+
+  const WDAY_NAMES = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+  const bestWdays  = [...avgWday].map((v, i) => ({ i, v })).sort((a, b) => b.v - a.v).slice(0, 3);
+
+  const recEl = document.getElementById('optRecommendations');
+  if (recEl) {
+    const recCards = [
+      {
+        icon: '☀',
+        title: 'Beste Tageszeit',
+        body: top3.length
+          ? top3.map(c => `${String(c.start).padStart(2,'0')}:00–${String(c.end + 1).padStart(2,'0')}:00 · Ø ${(c.avg * 1000).toFixed(0)} Wh`).join('<br>')
+          : 'Keine Daten',
+        sub: 'Verbrauch in diese Stunden verschieben'
+      },
+      {
+        icon: '📅',
+        title: 'Beste Wochentage',
+        body: bestWdays.map(x => `${WDAY_NAMES[x.i]} · Ø ${(x.v * 1000).toFixed(0)} Wh`).join('<br>'),
+        sub: 'An diesen Tagen lohnt sich Verbrauchsverlagerung am meisten'
+      },
+      {
+        icon: '⚡',
+        title: 'Max. Überschuss',
+        body: `Ø ${(maxSurplus * 1000).toFixed(0)} Wh pro Intervall`,
+        sub: `Einspeisung reduzieren durch: Waschmaschine, Geschirrspüler,<br>Boiler, E-Auto-Laden`
+      }
+    ];
+    recEl.innerHTML = recCards.map(c => `
+      <div class="card" style="padding:1rem 1.1rem">
+        <div style="font-size:1.4rem;margin-bottom:.4rem">${c.icon}</div>
+        <div style="font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--green);margin-bottom:.4rem">${c.title}</div>
+        <div style="font-size:.82rem;font-weight:600;color:var(--text);line-height:1.7">${c.body}</div>
+        <div style="font-size:.72rem;color:var(--text-muted);margin-top:.35rem">${c.sub}</div>
+      </div>`).join('');
+  }
+
+  // ── Heatmap ─────────────────────────────────────────────────────────────────
+  const hmEl = document.getElementById('optHeatmap');
+  if (hmEl) {
+    const maxVal = Math.max(...avgHeatmap.flat());
+    const cellW  = 22, cellH = 18;
+    const days   = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+    // Build table
+    let html = `<table style="border-collapse:collapse;font-size:.65rem;font-weight:600">`;
+    // Header row: days
+    html += `<tr><th style="width:28px;color:var(--text-muted);font-weight:500"></th>`;
+    days.forEach(d => { html += `<th style="width:${cellW}px;text-align:center;color:var(--text-mid);padding-bottom:3px">${d}</th>`; });
+    html += `</tr>`;
+    // Rows: hours
+    for (let h = 0; h < 24; h++) {
+      html += `<tr><td style="color:var(--text-muted);text-align:right;padding-right:4px;font-size:.62rem">${String(h).padStart(2,'0')}</td>`;
+      for (let wd = 0; wd < 7; wd++) {
+        const val = avgHeatmap[wd][h];
+        const t   = maxVal > 0 ? val / maxVal : 0;
+        // Green gradient: low → light gray, high → deep green
+        const r = Math.round(240 - t * 195);
+        const g = Math.round(240 - t * 50);
+        const b = Math.round(240 - t * 180);
+        const bg = `rgb(${r},${g},${b})`;
+        const fg = t > 0.5 ? '#fff' : 'transparent';
+        const title = `${days[wd]} ${String(h).padStart(2,'0')}:00 · Ø ${(val*1000).toFixed(0)} Wh`;
+        html += `<td title="${title}" style="background:${bg};width:${cellW}px;height:${cellH}px;text-align:center;color:${fg};border-radius:2px;margin:1px;border:1px solid #fff"></td>`;
+      }
+      html += `</tr>`;
+    }
+    html += `</table>`;
+    hmEl.innerHTML = html;
+  }
+
+  // ── Hourly bar chart ─────────────────────────────────────────────────────────
+  const hourLabels = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2,'0')}:00`);
+  AppState.charts.surplusHour = new Chart(document.getElementById('chartSurplusHour'), {
+    type: 'bar',
+    data: {
+      labels: hourLabels,
+      datasets: [{
+        label: 'Ø Überschuss (kWh)',
+        data:  avgHour.map(v => +v.toFixed(4)),
+        backgroundColor: avgHour.map(v => v >= threshold ? '#2d9e5f' : '#d1e9dc'),
+        borderRadius: 3,
+        barPercentage: .85
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 9 }, maxRotation: 0,
+               callback: (_, i) => i % 2 === 0 ? hourLabels[i] : '' } },
+        y: { grid: { color: '#EBF1FB' }, border: { display: false },
+             ticks: { font: { size: 10 }, callback: v => (v * 1000).toFixed(0) + ' Wh' } }
+      }
+    }
+  });
+
+  // ── Weekday bar chart ────────────────────────────────────────────────────────
+  const wdayFull = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+  const maxWday  = Math.max(...avgWday);
+  AppState.charts.surplusWeekday = new Chart(document.getElementById('chartSurplusWeekday'), {
+    type: 'bar',
+    data: {
+      labels: wdayFull,
+      datasets: [{
+        label: 'Ø Überschuss (kWh)',
+        data:  avgWday.map(v => +v.toFixed(4)),
+        backgroundColor: avgWday.map(v => v >= maxWday * 0.8 ? '#2d9e5f' : '#d1e9dc'),
+        borderRadius: 3,
+        barPercentage: .6
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+        y: { grid: { color: '#EBF1FB' }, border: { display: false },
+             ticks: { font: { size: 10 }, callback: v => (v * 1000).toFixed(0) + ' Wh' } }
+      }
+    }
+  });
+}
+
 // ── TIMELINE CHART ────────────────────────────────────────────────────────────
 // Continuous 15-min time series for every day with zoom/pan via chartjs-plugin-zoom.
 

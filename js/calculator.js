@@ -100,6 +100,7 @@ function calculateAndRender() {
   renderCharts(monthly, consMeters, agg);
   renderDayProfile(byTS, meters);
   renderTimeline(byTS, meters);
+  renderOptimisation(byTS, meters);
   renderMethodologyExample(byTS, consMeters, prodMeters);
 
   document.getElementById('results').classList.remove('hidden');
