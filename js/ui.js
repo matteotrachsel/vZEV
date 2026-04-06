@@ -140,7 +140,7 @@ function buildMeterConfig() {
         </div>
         <div style="flex:1;min-width:110px">
           <label>Bezeichnung</label>
-          <input type="text" id="label_${i}" value="${label}" placeholder="z. B. Ogimatte 10">
+          <input type="text" id="label_${i}" value="${label}" placeholder="z. B. Konsument">
         </div>
       </div>
       <div class="cfg-row">
@@ -211,7 +211,7 @@ function getTariff() {
 
 function getInvoiceHeader() {
   return {
-    name:        document.getElementById('invSenderName')?.value.trim()    || 'vZEV Ogimatte',
+    name:        document.getElementById('invSenderName')?.value.trim()    || 'vZEV Zusammenschluss',
     street:      document.getElementById('invSenderStreet')?.value.trim()  || '',
     city:        document.getElementById('invSenderCity')?.value.trim()    || '',
     contact:     document.getElementById('invSenderContact')?.value.trim() || '',

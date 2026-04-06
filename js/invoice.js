@@ -68,7 +68,7 @@ const INV = {
 function drawCoverPage(doc, { header, dateStr, dueDateStr, periodStr, invNr, meterData, periodStart, periodEnd, totalPages }) {
   const { ML, MR, BLACK, DGRAY, GRAY, LGRAY, BORDER } = INV;
   const hdr  = header || {};
-  const name = hdr.name || 'vZEV Ogimatte';
+  const name = hdr.name || 'vZEV Zusammenschluss';
 
   // ── Logo box (top right) ──────────────────────────────────────────────────
   doc.setFillColor(30, 30, 30);
