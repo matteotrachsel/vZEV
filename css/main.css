@@ -557,6 +557,57 @@ tr.tfoot td {
 /* ── CHARTS ─────────────────────────────────────────────────────────────── */
 .chart-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 1.5rem; }
 @media (max-width: 700px) { .chart-grid { grid-template-columns: 1fr; } }
+
+/* ── MOBILE ─────────────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  /* Nav */
+  nav {
+    padding: 0 1rem;
+    height: 52px;
+    gap: .75rem;
+  }
+  .nav-divider,
+  .nav-title { display: none; }
+  .nav-badge {
+    font-size: .62rem;
+    padding: .15rem .45rem;
+  }
+  .nav-logo-text { font-size: 1.1rem; }
+  .nav-logo-mark svg { width: 26px; height: 26px; }
+
+  /* Page header */
+  .page-header { padding: 1.1rem 1rem .9rem; }
+  .page-header h1 { font-size: 1.15rem; }
+  .page-header p { font-size: .78rem; }
+  .breadcrumb { display: none; }
+
+  /* Stepper */
+  .stepper-wrap { padding: 0 1rem; }
+  .step { padding: .7rem 0; padding-right: 1rem; }
+  .step-label { font-size: .72rem; white-space: normal; }
+
+  /* Main */
+  main { padding: 1.25rem 1rem 3rem; }
+
+  /* Cards */
+  .card { padding: 1.1rem 1rem; }
+
+  /* Summary tiles */
+  .sval { font-size: 1.35rem; }
+
+  /* Period bar */
+  .period-bar { flex-wrap: wrap; gap: .5rem; padding: .6rem .9rem; }
+
+  /* Table horizontal scroll */
+  .table-wrap { margin: 0 -1rem; padding: 0 1rem; }
+
+  /* Meter config grid */
+  .meter-config-grid { grid-template-columns: 1fr; }
+
+  /* Buttons: full width in action rows */
+  .section-actions { flex-wrap: wrap; }
+  .section-actions .btn { flex: 1 1 auto; justify-content: center; }
+}
 .chart-box { position: relative; }
 .chart-label { font-size: .73rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: .75rem; }
 
