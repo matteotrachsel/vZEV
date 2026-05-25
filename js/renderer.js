@@ -37,7 +37,7 @@ function renderMonthly(monthly, tariff, nV) {
     const eigen = d.cons > 0 ? (d.vzev / d.cons) * 100 : 0;
     const eb   = d.grid * tariff.energyAllIn;           // Energiebezug cost
     const vz   = d.vzev * tariff.vzevPrice;             // vZEV solar cost
-    const kz   = d.cons * tariff.konzession;            // Konzessionsabgabe (gesamter Verbrauch)
+    const kz   = d.grid * tariff.konzession;            // Konzessionsabgabe (nur auf Netzbezug/Einheitstarif)
     const fee  = nV * tariff.grundtarif; // monthly fees (all meters)
     const fi   = d.fi * tariff.feedIn;                  // feed-in revenue
     const total = eb + vz + kz + fee - fi;
@@ -150,7 +150,7 @@ function renderCosts(agg, meters, tariff) {
     const v   = meterVzev[i];
     const eb  = g * tariff.energyAllIn;
     const vz  = v * tariff.vzevPrice;
-    const kz  = (g + v) * tariff.konzession;
+    const kz  = g * tariff.konzession; // nur auf Netzbezug, nicht auf vZEV-Solar
     const fee = totalFee;
     const total = eb + vz + kz + fee;
     aG += g; aV += v; aT += total;
