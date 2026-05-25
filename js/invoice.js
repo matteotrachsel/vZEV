@@ -171,30 +171,20 @@ function drawCoverPage(doc, { header, dateStr, dueDateStr, periodStr, invNr, met
     ty += 7;
   });
 
-  // Divider + Gesamtbetrag
+  // Divider + Zu bezahlender Betrag (einzige Summen-Zeile)
   doc.setDrawColor(...BORDER);
   doc.setLineWidth(0.35);
-  doc.line(ML, ty, MR, ty); ty += 6;
+  doc.line(ML, ty, MR, ty); ty += 7;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
+  doc.setFontSize(10);
   doc.setTextColor(...BLACK);
-  doc.text('Gesamtbetrag (gemäss Detailseiten)', ML, ty);
+  doc.text('Zu bezahlender Betrag (inkl. MWSt.)', ML, ty);
   doc.text('CHF', MR - 30, ty);
   doc.text(fmtCHF(grandTotal), MR, ty, { align: 'right' });
-  ty += 7;
-
-  // Zu bezahlender Betrag
-  doc.setDrawColor(...BORDER);
-  doc.line(ML, ty - 2, MR, ty - 2);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(...BLACK);
-  doc.text('Zu bezahlender Betrag', ML, ty + 4);
-  doc.text('CHF', MR - 30, ty + 4);
-  doc.text(fmtCHF(grandTotal), MR, ty + 4, { align: 'right' });
   doc.setDrawColor(...BLACK);
   doc.setLineWidth(0.6);
-  doc.line(ML, ty + 7, MR, ty + 7);
+  doc.line(ML, ty + 3, MR, ty + 3);
+  ty += 4;
 
   // ── Footer text ───────────────────────────────────────────────────────────
   ty += 20;
@@ -350,52 +340,38 @@ function drawDetailPage(doc, { m, g, v, cons, fiKwh, eb, vz, kz, grundtarifTotal
     y += 5.5;
   }
 
-  fRow('Grundtarif',                pStr, `${dayCount} Tage`, `${grundJahr} CHF/a`,                      fmtCHF(grundtarifTotal));
-  fRow('Energie Einheitstarif',     pStr, `${g.toFixed(0)} kWh`, `${(tariff.energyAllIn*100).toFixed(2)} Rp.`, fmtCHF(eb));
-  fRow('vZEV-Eigenverbrauch Solar', pStr, `${v.toFixed(0)} kWh`, `${(tariff.vzevPrice*100).toFixed(2)} Rp.`,   fmtCHF(vz));
-  fRow('Konzessionsabgabe (Gemeinde)', pStr, `${g.toFixed(0)} kWh`,    `${(tariff.konzession*100).toFixed(2)} Rp.`, fmtCHF(kz));
+  fRow('Grundtarif',                   pStr, `${dayCount} Tage`,    `${grundJahr} CHF/a`,                         fmtCHF(grundtarifTotal));
+  fRow('Energie Einheitstarif',        pStr, `${g.toFixed(0)} kWh`, `${(tariff.energyAllIn*100).toFixed(2)} Rp.`, fmtCHF(eb));
+  fRow('vZEV-Eigenverbrauch Solar',    pStr, `${v.toFixed(0)} kWh`, `${(tariff.vzevPrice*100).toFixed(2)} Rp.`,   fmtCHF(vz));
+  fRow('Konzessionsabgabe (Gemeinde)', pStr, `${g.toFixed(0)} kWh`, `${(tariff.konzession*100).toFixed(2)} Rp.`,  fmtCHF(kz));
 
-  // Zwischentotal
-  doc.setDrawColor(...BORDER);
-  doc.line(ML, y - 2, MR, y - 2);
-  fRow('Zwischentotal', '', '', '', fmtCHF(subtotal), true);
-  y += 1;
-
-  // Feed-in
+  // Optional: Zwischentotal + Rückliefervergütung (nur wenn Einspeisung > 0)
   if (fiAmt > 0) {
-    fRow('Rückliefervergütung', pStr, `${fiKwh.toFixed(0)} kWh`, `${(tariff.feedIn*100).toFixed(2)} Rp.`, `- ${fmtCHF(fiAmt)}`);
+    y += 2;
     doc.setDrawColor(...BORDER);
     doc.line(ML, y - 2, MR, y - 2);
-    y += 2;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...BLACK);
+    doc.text('Zwischentotal', fE, y + 2);
+    doc.text(fmtCHF(subtotal), fAmt, y + 2, { align: 'right' });
+    y += 8;
+    fRow('Rückliefervergütung', pStr, `${fiKwh.toFixed(0)} kWh`, `${(tariff.feedIn*100).toFixed(2)} Rp.`, `- ${fmtCHF(fiAmt)}`);
   }
 
-  // Total
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(...BLACK);
-  doc.text('Total inkl. MWSt.', fE, y);
-  doc.text(fmtCHF(total), fAmt, y, { align: 'right' });
-  y += 9;
-
-  // ── Zusammenzug ───────────────────────────────────────────────────────────
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.text('Zusammenzug Bezugsstelle', fE, y); y += 2;
-  doc.setDrawColor(...BORDER);
-  doc.line(ML, y, MR, y); y += 5;
-
-  doc.setFont('helvetica', 'normal');
-  doc.text('Total inkl. MWSt.', fE, y);
-  doc.text(fmtCHF(total), fAmt, y, { align: 'right' }); y += 3;
-
-  doc.setDrawColor(...BORDER);
-  doc.line(ML, y, MR, y); y += 5;
-  doc.setFont('helvetica', 'bold');
-  doc.text('Zu bezahlender Betrag aus Bezugsstelle', fE, y);
-  doc.text(fmtCHF(total), fAmt, y, { align: 'right' });
+  // ── Endtotal ─────────────────────────────────────────────────────────────
+  y += 3;
   doc.setDrawColor(...BLACK);
   doc.setLineWidth(0.5);
-  doc.line(fE + 95, y + 2.5, MR, y + 2.5);
+  doc.line(ML, y, MR, y);
+  y += 6;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(...BLACK);
+  doc.text('Zu bezahlender Betrag (inkl. MWSt.)', fE, y);
+  doc.text(fmtCHF(total), fAmt, y, { align: 'right' });
+  doc.setLineWidth(0.6);
+  doc.line(ML, y + 3, MR, y + 3);
 
   // ── Footer ────────────────────────────────────────────────────────────────
   doc.setFont('helvetica', 'normal');
