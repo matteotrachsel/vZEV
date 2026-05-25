@@ -31,7 +31,7 @@ function exportPDF() {
     const grundtarifTotal = mc * tariff.grundtarif;
     const eb     = g    * tariff.energyAllIn;
     const vz     = v    * tariff.vzevPrice;
-    const kz     = cons * tariff.konzession;
+    const kz     = g    * tariff.konzession; // nur auf Netzbezug (Einheitstarif), nicht auf vZEV-Solar
     const fiAmt  = fiKwh * tariff.feedIn;
     const subtotal = grundtarifTotal + eb + vz + kz;
     const total    = subtotal - fiAmt;
@@ -353,7 +353,7 @@ function drawDetailPage(doc, { m, g, v, cons, fiKwh, eb, vz, kz, grundtarifTotal
   fRow('Grundtarif',                pStr, `${dayCount} Tage`, `${grundJahr} CHF/a`,                      fmtCHF(grundtarifTotal));
   fRow('Energie Einheitstarif',     pStr, `${g.toFixed(0)} kWh`, `${(tariff.energyAllIn*100).toFixed(2)} Rp.`, fmtCHF(eb));
   fRow('vZEV-Eigenverbrauch Solar', pStr, `${v.toFixed(0)} kWh`, `${(tariff.vzevPrice*100).toFixed(2)} Rp.`,   fmtCHF(vz));
-  fRow('Konzessionsabgabe (Gemeinde)', pStr, `${cons.toFixed(0)} kWh`, `${(tariff.konzession*100).toFixed(2)} Rp.`, fmtCHF(kz));
+  fRow('Konzessionsabgabe (Gemeinde)', pStr, `${g.toFixed(0)} kWh`,    `${(tariff.konzession*100).toFixed(2)} Rp.`, fmtCHF(kz));
 
   // Zwischentotal
   doc.setDrawColor(...BORDER);
