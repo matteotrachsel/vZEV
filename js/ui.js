@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
   syncVzevPrice();
 
   // Auto-recalculate when tariff inputs change (only if data is loaded).
-  document.querySelectorAll('#feedInPrice,#grundtarif,#energyAllIn,#vzevPrice')
+  document.querySelectorAll('#feedInPrice,#grundtarif,#energyAllIn,#vzevPrice,#vzevShare,#konzession')
     .forEach(el => el.addEventListener('change', () => {
       syncVzevPrice();
       if (AppState.parsedData.length) calculateAndRender();
@@ -194,9 +194,11 @@ function getMeterConfig() {
 function syncVzevPrice() {
   const energyEl = document.getElementById('energyAllIn');
   const vzevEl   = document.getElementById('vzevPrice');
+  const shareEl  = document.getElementById('vzevShare');
   if (!energyEl || !vzevEl) return;
   const energy = parseFloat(energyEl.value);
-  if (!isNaN(energy)) vzevEl.value = (energy * 0.8).toFixed(2);
+  const share  = shareEl ? parseFloat(shareEl.value) : 80;
+  if (!isNaN(energy) && !isNaN(share)) vzevEl.value = (energy * share / 100).toFixed(2);
 }
 
 function getTariff() {
@@ -204,7 +206,8 @@ function getTariff() {
   const vzevPrice   = parseFloat(document.getElementById('vzevPrice').value)   / 100;  // CHF/kWh internal solar (80% of energyAllIn)
   const grundtarif  = parseFloat(document.getElementById('grundtarif').value) / 12;    // CHF/Jahr → CHF/Monat
   const feedIn      = parseFloat(document.getElementById('feedInPrice').value) / 100;  // CHF/kWh feed-in
-  return { energyAllIn, vzevPrice, grundtarif, feedIn };
+  const konzession  = parseFloat(document.getElementById('konzession').value)  / 100;  // CHF/kWh Gemeinde-Konzessionsabgabe
+  return { energyAllIn, vzevPrice, grundtarif, feedIn, konzession };
 }
 
 // ── Invoice header config ─────────────────────────────────────────────────────

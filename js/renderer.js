@@ -15,6 +15,7 @@ function renderMonthly(monthly, tariff, nV) {
   const months = Object.keys(monthly).sort();
   const ep = `${(tariff.energyAllIn * 100).toFixed(2)} Rp`;
   const vp = `${(tariff.vzevPrice   * 100).toFixed(2)} Rp`;
+  const kp = `${(tariff.konzession  * 100).toFixed(2)} Rp`;
   document.querySelector('#monthlyTable thead').innerHTML = `<tr>
     <th>Monat</th>
     <th class="tr">Verbrauch kWh</th>
@@ -25,21 +26,23 @@ function renderMonthly(monthly, tariff, nV) {
     <th class="tr">Einspeisung kWh</th>
     <th class="tr">Energiebezug (${ep})</th>
     <th class="tr">vZEV-Solar (${vp})</th>
+    <th class="tr">Konzession (${kp})</th>
     <th class="tr">Grundgebühren</th>
     <th class="tr">Einspeiseverg.</th>
     <th class="tr">Total CHF</th></tr>`;
 
-  let sC=0, sP=0, sV=0, sG=0, sF=0, sEB=0, sVZ=0, sFee=0, sFI=0, sT=0;
+  let sC=0, sP=0, sV=0, sG=0, sF=0, sEB=0, sVZ=0, sKZ=0, sFee=0, sFI=0, sT=0;
   const rows = months.map(mk => {
     const d    = monthly[mk];
     const eigen = d.cons > 0 ? (d.vzev / d.cons) * 100 : 0;
     const eb   = d.grid * tariff.energyAllIn;           // Energiebezug cost
     const vz   = d.vzev * tariff.vzevPrice;             // vZEV solar cost
+    const kz   = d.cons * tariff.konzession;            // Konzessionsabgabe (gesamter Verbrauch)
     const fee  = nV * tariff.grundtarif; // monthly fees (all meters)
     const fi   = d.fi * tariff.feedIn;                  // feed-in revenue
-    const total = eb + vz + fee - fi;
+    const total = eb + vz + kz + fee - fi;
     sC+=d.cons; sP+=d.prod; sV+=d.vzev; sG+=d.grid;
-    sF+=d.fi; sEB+=eb; sVZ+=vz; sFee+=fee; sFI+=fi; sT+=total;
+    sF+=d.fi; sEB+=eb; sVZ+=vz; sKZ+=kz; sFee+=fee; sFI+=fi; sT+=total;
     return `<tr><td><strong>${fmtMonth(mk)}</strong></td>
       <td class="tr">${d.cons.toFixed(1)}</td>
       <td class="tr tg">${d.prod.toFixed(1)}</td>
@@ -49,6 +52,7 @@ function renderMonthly(monthly, tariff, nV) {
       <td class="tr">${d.fi.toFixed(1)}</td>
       <td class="tr">${fmtCHF(eb)}</td>
       <td class="tr tg">${fmtCHF(vz)}</td>
+      <td class="tr">${fmtCHF(kz)}</td>
       <td class="tr">${fmtCHF(fee)}</td>
       <td class="tr" style="color:var(--green)">–${fmtCHF(fi)}</td>
       <td class="tr tc">${fmtCHF(total)}</td></tr>`;
@@ -61,6 +65,7 @@ function renderMonthly(monthly, tariff, nV) {
     <td class="tr">${sF.toFixed(1)}</td>
     <td class="tr">${fmtCHF(sEB)}</td>
     <td class="tr">${fmtCHF(sVZ)}</td>
+    <td class="tr">${fmtCHF(sKZ)}</td>
     <td class="tr">${fmtCHF(sFee)}</td>
     <td class="tr" style="color:var(--green)">–${fmtCHF(sFI)}</td>
     <td class="tr tc">${fmtCHF(sT)}</td></tr>`);
@@ -114,6 +119,7 @@ function renderCosts(agg, meters, tariff) {
   const cM = meters.filter(m => m.typ === 'Verbrauch');
   const ep = `${(tariff.energyAllIn * 100).toFixed(2)} Rp`;
   const vp = `${(tariff.vzevPrice   * 100).toFixed(2)} Rp`;
+  const kp = `${(tariff.konzession  * 100).toFixed(2)} Rp`;
 
   document.querySelector('#costTable thead').innerHTML = `<tr>
     <th>Zähler / Adresse</th>
@@ -121,6 +127,7 @@ function renderCosts(agg, meters, tariff) {
     <th class="tr">vZEV kWh</th>
     <th class="tr">Energiebezug (${ep})</th>
     <th class="tr">vZEV-Solar (${vp})</th>
+    <th class="tr">Konzession (${kp})</th>
     <th class="tr">Grundgebühren CHF</th>
     <th class="tr">Total CHF</th></tr>`;
 
@@ -143,8 +150,9 @@ function renderCosts(agg, meters, tariff) {
     const v   = meterVzev[i];
     const eb  = g * tariff.energyAllIn;
     const vz  = v * tariff.vzevPrice;
+    const kz  = (g + v) * tariff.konzession;
     const fee = totalFee;
-    const total = eb + vz + fee;
+    const total = eb + vz + kz + fee;
     aG += g; aV += v; aT += total;
     return `<tr>
       <td><div style="font-weight:700;color:var(--text)">${m.label || m.messpunktNr}</div>
@@ -154,13 +162,14 @@ function renderCosts(agg, meters, tariff) {
       <td class="tr tg">${v.toFixed(1)}</td>
       <td class="tr">${fmtCHF(eb)}</td>
       <td class="tr tg">${fmtCHF(vz)}</td>
+      <td class="tr">${fmtCHF(kz)}</td>
       <td class="tr">${fmtCHF(fee)}</td>
       <td class="tr tc">${fmtCHF(total)}</td></tr>`;
   });
   rows.push(`<tr class="tfoot"><td>Total</td>
     <td class="tr">${aG.toFixed(1)}</td>
     <td class="tr">${aV.toFixed(1)}</td>
-    <td class="tr">–</td><td class="tr">–</td><td class="tr">–</td>
+    <td class="tr">–</td><td class="tr">–</td><td class="tr">–</td><td class="tr">–</td>
     <td class="tr tc">${fmtCHF(aT)}</td></tr>`);
   document.querySelector('#costTable tbody').innerHTML = rows.join('');
 }
