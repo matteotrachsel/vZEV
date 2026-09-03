@@ -78,12 +78,14 @@ function renderMeterAgg(agg, meters, distStats) {
     <th class="tr">Verbrauch kWh</th><th class="tr">Produktion kWh</th>
     <th class="tr">vZEV-Anteil kWh</th><th class="tr">Netzbezug kWh</th>
     <th class="tr">Eigendeckung</th>
-    <th class="tr">Ø Solar-Zuteilung</th>
+    <th class="tr">Ø Pool-Zuteilung</th>
     <th class="tr">Spanne (Min–Max)</th></tr>`;
 
   document.querySelector('#meterTable tbody').innerHTML = meters.map(m => {
-    let c = 0, v = 0, g = 0, p = 0;
-    Object.values(agg[m.messpunktNr] || {}).forEach(d => { c += d.cons; v += d.vzev; g += d.grid; p += d.prod; });
+    let c = 0, v = 0, g = 0, p = 0, own = 0;
+    Object.values(agg[m.messpunktNr] || {}).forEach(d => {
+      c += d.cons; v += d.vzev; g += d.grid; p += d.prod; own += (d.own || 0);
+    });
     const isP       = m.typ === 'Produktion';
     const typeStyle = isP
       ? 'background:var(--green-light);color:var(--green)'
@@ -106,7 +108,8 @@ function renderMeterAgg(agg, meters, distStats) {
       <td>${typeTag}</td>
       <td class="tr">${!isP ? c.toFixed(1) : '–'}</td>
       <td class="tr tg">${p > 0 ? p.toFixed(1) : '–'}</td>
-      <td class="tr">${!isP ? v.toFixed(1) : '–'}</td>
+      <td class="tr">${!isP ? v.toFixed(1) : '–'}
+          ${!isP && own > 0 ? `<div style="font-size:.68rem;color:var(--text-muted);font-weight:400">davon ${own.toFixed(1)} eigene PV</div>` : ''}</td>
       <td class="tr">${!isP ? g.toFixed(1) : '–'}</td>
       <td class="tr">${!isP ? (c > 0 ? (v / c * 100).toFixed(1) : 0) + '%' : '–'}</td>
       <td class="tr">${avgShare}</td>
@@ -279,8 +282,37 @@ function renderMethodologyExample(byTS, consMeters, prodMeters) {
   const totalC   = cons.reduce((s, x) => s + x.c, 0);
   const sc       = Math.min(prod, totalC);
   const fi       = Math.max(0, prod - totalC);
-  const shares   = cons.map(({ m, c }) => ({ m, c, v: totalC > 0 ? (c / totalC) * sc : 0 }));
   const prodLabel = prodMeters.map(m => m.label || 'Solar').join(' + ');
+
+  // Gleiche zweistufige Verteilung wie in calculateAndRender().
+  const rest = new Map(cons.map(({ m, c }) => [m.messpunktNr, c]));
+  const own  = new Map(cons.map(({ m })    => [m.messpunktNr, 0]));
+  let pool = 0;
+  prodMeters.forEach(pm => {
+    const sl = slots[pm.messpunktNr];
+    let   p  = sl ? Math.max(sl.bezug, sl.einspeisung) : 0;
+    const own1 = pm.zaehlerNr ? consMeters.filter(cm => cm.zaehlerNr && cm.zaehlerNr === pm.zaehlerNr) : [];
+    const demand = own1.reduce((s, cm) => s + rest.get(cm.messpunktNr), 0);
+    if (demand > 0) {
+      const supply = Math.min(p, demand);
+      own1.forEach(cm => {
+        const share = (rest.get(cm.messpunktNr) / demand) * supply;
+        own.set(cm.messpunktNr,  own.get(cm.messpunktNr)  + share);
+        rest.set(cm.messpunktNr, rest.get(cm.messpunktNr) - share);
+      });
+      p -= supply;
+    }
+    pool += p;
+  });
+  const openC   = cons.reduce((s, { m }) => s + rest.get(m.messpunktNr), 0);
+  const poolUse = Math.min(pool, openC);
+  const shares  = cons.map(({ m, c }) => {
+    const e = own.get(m.messpunktNr);
+    const r = rest.get(m.messpunktNr);
+    const q = openC > 0 ? (r / openC) * poolUse : 0;
+    return { m, c, e, r, q, v: e + q };
+  });
+  const anyOwn = shares.some(s => s.e > 0);
 
   const thead = `<tr>
     <th>Grösse</th>
@@ -296,7 +328,13 @@ function renderMethodologyExample(byTS, consMeters, prodMeters) {
     `<tr><td>Produktion P(t)</td>${shares.map(() => `<td class="tr">–</td>`).join('')}<td class="tr tg">${p(prod)}</td><td class="tr">–</td></tr>`,
     `<tr><td>Selbstverbrauch SC(t) = min(${p3(prod)}, ${p3(totalC)})</td>${shares.map(() => `<td class="tr">–</td>`).join('')}<td class="tr">–</td><td class="tr tg"><strong>${p(sc)}</strong></td></tr>`,
     `<tr><td>Netzeinspeisung FI(t) = max(0, ${p3(prod)}−${p3(totalC)})</td>${shares.map(() => `<td class="tr">–</td>`).join('')}<td class="tr">–</td><td class="tr" style="color:var(--amber)"><strong>${p(fi)}</strong></td></tr>`,
-    `<tr><td>Solar-Anteil V(t) = C&nbsp;/&nbsp;${p3(totalC)}&nbsp;×&nbsp;${p3(sc)}</td>${shares.map(({ c, v }) => `<td class="tr tg">${p3(c)}/${p3(totalC)} × ${p3(sc)} = <strong>${p(v)}</strong></td>`).join('')}<td class="tr">–</td><td class="tr tg"><strong>${p(sc)}</strong></td></tr>`,
+    ...(anyOwn ? [
+      `<tr><td><strong>Stufe 1</strong> – Eigenverbrauch E(t) am eigenen Anschluss (gleiche Zählernummer)</td>${shares.map(({ e }) => `<td class="tr tg"><strong>${p(e)}</strong></td>`).join('')}<td class="tr">–</td><td class="tr tg"><strong>${p(sc - poolUse)}</strong></td></tr>`,
+      `<tr><td>Restbedarf R(t) = C − E</td>${shares.map(({ c, e, r }) => `<td class="tr">${p3(c)} − ${p3(e)} = <strong>${p(r)}</strong></td>`).join('')}<td class="tr">–</td><td class="tr"><strong>${p(openC)}</strong></td></tr>`,
+      `<tr><td>Rest-Produktion in den vZEV-Pool</td>${shares.map(() => `<td class="tr">–</td>`).join('')}<td class="tr tg">${p(pool)}</td><td class="tr tg"><strong>${p(poolUse)}</strong></td></tr>`
+    ] : []),
+    `<tr><td><strong>Stufe 2</strong> – Pool-Anteil Q(t) = R&nbsp;/&nbsp;${p3(openC)}&nbsp;×&nbsp;${p3(poolUse)}</td>${shares.map(({ r, q }) => `<td class="tr tg">${p3(r)}/${p3(openC)} × ${p3(poolUse)} = <strong>${p(q)}</strong></td>`).join('')}<td class="tr">–</td><td class="tr tg"><strong>${p(poolUse)}</strong></td></tr>`,
+    `<tr><td>Solar total V(t) = E + Q</td>${shares.map(({ e, q, v }) => `<td class="tr tg">${p3(e)} + ${p3(q)} = <strong>${p(v)}</strong></td>`).join('')}<td class="tr">–</td><td class="tr tg"><strong>${p(sc)}</strong></td></tr>`,
     `<tr><td>Netzbezug G(t) = C − V</td>${shares.map(({ c, v }) => `<td class="tr">${p3(c)} − ${p3(v)} = <strong>${p(c - v)}</strong></td>`).join('')}<td class="tr">–</td><td class="tr"><strong>${p(totalC - sc)}</strong></td></tr>`
   ].join('');
 

@@ -21,10 +21,11 @@ function exportPDF() {
 
   // Pre-compute per-meter totals
   const meterData = cM.map(m => {
-    let g = 0, v = 0, cons = 0, fiKwh = 0;
+    let g = 0, v = 0, own = 0, cons = 0, fiKwh = 0;
     Object.values(agg[m.messpunktNr] || {}).forEach(d => {
       g    += d.grid;
       v    += d.vzev;
+      own  += (d.own || 0);
       cons += d.cons;
       fiKwh += (d.fi || 0);
     });
@@ -35,7 +36,7 @@ function exportPDF() {
     const fiAmt  = fiKwh * tariff.feedIn;
     const subtotal = grundtarifTotal + eb + vz + kz;
     const total    = subtotal - fiAmt;
-    return { m, g, v, cons, fiKwh, eb, vz, kz, grundtarifTotal, fiAmt, subtotal, total };
+    return { m, g, v, own, cons, fiKwh, eb, vz, kz, grundtarifTotal, fiAmt, subtotal, total };
   });
 
   const totalPages = meterData.length + 1;
@@ -209,7 +210,7 @@ function drawCoverPage(doc, { header, dateStr, dueDateStr, periodStr, invNr, met
 
 // ── Detail Page ───────────────────────────────────────────────────────────────
 
-function drawDetailPage(doc, { m, g, v, cons, fiKwh, eb, vz, kz, grundtarifTotal, fiAmt, subtotal, total, tariff, mc, agg, periodStart, periodEnd, invNr, header, pageNum, totalPages }) {
+function drawDetailPage(doc, { m, g, v, own, cons, fiKwh, eb, vz, kz, grundtarifTotal, fiAmt, subtotal, total, tariff, mc, agg, periodStart, periodEnd, invNr, header, pageNum, totalPages }) {
   const { ML, MR, BLACK, DGRAY, GRAY, LGRAY, BORDER } = INV;
   const hdr = header || {};
 
@@ -340,9 +341,21 @@ function drawDetailPage(doc, { m, g, v, cons, fiKwh, eb, vz, kz, grundtarifTotal
     y += 5.5;
   }
 
+  const ownKwh  = own || 0;
+  const poolKwh = v - ownKwh;
+  const vzPrice = `${(tariff.vzevPrice*100).toFixed(2)} Rp.`;
+
   fRow('Grundtarif',                   pStr, `${dayCount} Tage`,    `${grundJahr} CHF/a`,                         fmtCHF(grundtarifTotal));
   fRow('Energie Einheitstarif',        pStr, `${g.toFixed(0)} kWh`, `${(tariff.energyAllIn*100).toFixed(2)} Rp.`, fmtCHF(eb));
-  fRow('vZEV-Eigenverbrauch Solar',    pStr, `${v.toFixed(0)} kWh`, `${(tariff.vzevPrice*100).toFixed(2)} Rp.`,   fmtCHF(vz));
+  // Eigenverbrauch der eigenen PV-Anlage wird separat ausgewiesen – der
+  // Netzbetreiber verrechnet ihn gar nicht, im vZEV läuft er über den
+  // internen Solartarif.
+  if (ownKwh >= 0.5) {
+    fRow('Eigenverbrauch eigene PV-Anlage', pStr, `${ownKwh.toFixed(0)} kWh`,  vzPrice, fmtCHF(ownKwh  * tariff.vzevPrice));
+    fRow('Bezug vom vZEV (Solar)',          pStr, `${poolKwh.toFixed(0)} kWh`, vzPrice, fmtCHF(poolKwh * tariff.vzevPrice));
+  } else {
+    fRow('vZEV-Eigenverbrauch Solar',       pStr, `${v.toFixed(0)} kWh`,       vzPrice, fmtCHF(vz));
+  }
   fRow('Konzessionsabgabe (Gemeinde)', pStr, `${g.toFixed(0)} kWh`, `${(tariff.konzession*100).toFixed(2)} Rp.`,  fmtCHF(kz));
 
   // Optional: Zwischentotal + Rückliefervergütung (nur wenn Einspeisung > 0)

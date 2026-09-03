@@ -94,3 +94,59 @@ function matchMP(raw) {
   }
   return raw;
 }
+
+// ── VIRTUELLE vZEV-SUMMENZÄHLPUNKTE ───────────────────────────────────────────
+// Netzbetreiber (z. B. BKW) liefern neben den physischen Zählern ein oder zwei
+// *virtuelle* Messpunkte mit, die das vZEV-Ergebnis bereits enthalten:
+//   – ein Bezugspunkt    mit max(0, ΣVerbrauch − ΣProduktion) je Intervall
+//   – ein Einspeisepunkt mit max(0, ΣProduktion − ΣVerbrauch) je Intervall
+// Werden sie wie normale Zähler behandelt, zählt der ganze vZEV doppelt.
+// Erkennung rein numerisch: ein Kandidat ist virtuell, wenn sich seine Reihe
+// nach seinem Entfernen in JEDEM Intervall aus den übrigen Messpunkten ergibt.
+function detectVirtualMPs(rows) {
+  const slotMap = new Map();  // ts → { messpunkt: row }
+  const totals  = new Map();  // messpunkt → { b, e }
+
+  rows.forEach(r => {
+    const ts = r.datum.getTime();
+    if (!slotMap.has(ts)) slotMap.set(ts, {});
+    slotMap.get(ts)[r.messpunkt] = r;
+    const t = totals.get(r.messpunkt) || { b: 0, e: 0 };
+    t.b += r.bezug;
+    t.e += r.einspeisung;
+    totals.set(r.messpunkt, t);
+  });
+
+  const mps  = [...totals.keys()];
+  const draw = mps.filter(m => totals.get(m).b > 0 && totals.get(m).b >= totals.get(m).e);
+  const feed = mps.filter(m => totals.get(m).e >  totals.get(m).b);
+  // Ein virtueller Punkt kann nur existieren, wenn danach noch je ein
+  // physischer Bezugs- und Einspeisepunkt übrig bleibt.
+  if (draw.length < 2 && feed.length < 2) return [];
+
+  const slots = [...slotMap.values()];
+  const near  = (a, b) => Math.abs(a - b) <= 1e-6 + 1e-9 * Math.abs(b);
+
+  const matches = (vd, vf) => {
+    const dd = draw.filter(m => m !== vd);
+    const ff = feed.filter(m => m !== vf);
+    if (!dd.length || !ff.length) return false;
+    return slots.every(s => {
+      const c = dd.reduce((x, m) => x + (s[m]?.bezug       || 0), 0);
+      const p = ff.reduce((x, m) => x + (s[m]?.einspeisung || 0), 0);
+      if (vd && !near(s[vd]?.bezug       || 0, Math.max(0, c - p))) return false;
+      if (vf && !near(s[vf]?.einspeisung || 0, Math.max(0, p - c))) return false;
+      return true;
+    });
+  };
+
+  // Breitester Treffer gewinnt: das Paar (Bezug + Einspeisung) vor Einzelpunkten.
+  let best = [];
+  [...draw, null].forEach(vd => [...feed, null].forEach(vf => {
+    if (!vd && !vf) return;
+    const cand = [vd, vf].filter(Boolean);
+    if (cand.length <= best.length) return;
+    if (matches(vd, vf)) best = cand;
+  }));
+  return best;
+}

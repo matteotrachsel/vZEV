@@ -78,10 +78,17 @@ async function processFile(file) {
       return;
     }
     AppState.detectedMPs = [...new Set(AppState.parsedData.map(r => r.messpunkt))].sort();
+    AppState.virtualMPs  = detectVirtualMPs(AppState.parsedData);
     const n = AppState.detectedMPs.length;
+    const v = AppState.virtualMPs.length;
     st.innerHTML = mkAlert('as',
       `${AppState.parsedData.length.toLocaleString('de-CH')} Datenpunkte · ` +
       `${n} Messpunkt${n !== 1 ? 'e' : ''} erkannt aus <strong>${file.name}</strong>`
+    );
+    if (v) st.innerHTML += mkAlert('aw',
+      `${v} virtuelle${v !== 1 ? ' vZEV-Summenzählpunkte' : 'r vZEV-Summenzählpunkt'} erkannt und ` +
+      `auf <strong>Ignorieren</strong> gesetzt. Diese enthalten bereits das vZEV-Ergebnis des ` +
+      `Netzbetreibers – als Verbrauch gerechnet würde der Zusammenschluss doppelt verrechnet.`
     );
     buildMeterConfig();
     document.getElementById('results').classList.add('hidden');
@@ -102,16 +109,23 @@ function buildMeterConfig() {
   const knownFound = AppState.detectedMPs.filter(mp =>
     KNOWN.some(k => k.messpunktNr === mp || mp.includes(k.messpunktNr) || k.messpunktNr.includes(mp))
   );
+  const nVirt = AppState.virtualMPs.length;
   infoEl.innerHTML =
     `${AppState.detectedMPs.length} Messpunkt${AppState.detectedMPs.length !== 1 ? 'e' : ''} in der Datei gefunden.` +
     (knownFound.length
       ? ` <strong>${knownFound.length} bekannte${knownFound.length === 1 ? 'r' : ''} Messpunkt${knownFound.length !== 1 ? 'e' : ''}</strong> automatisch vorausgefüllt.`
       : '') +
-    ' Typ und Bezeichnung prüfen, dann <em>Auswertung erstellen</em> klicken.';
+    (nVirt
+      ? ` <strong>${nVirt} virtuelle${nVirt === 1 ? 'r Summenzählpunkt</strong> wurde' : ' Summenzählpunkte</strong> wurden'} auf <em>Ignorieren</em> gesetzt.`
+      : '') +
+    ' Typ und Bezeichnung prüfen, dann <em>Auswertung erstellen</em> klicken.' +
+    ' <strong>Zählernummer:</strong> PV-Anlage und Verbrauch am selben Anschluss dieselbe Nummer geben –' +
+    ' dann wird deren Eigenverbrauch vor der vZEV-Verteilung gedeckt (wie beim Netzbetreiber).';
 
   grid.innerHTML = AppState.detectedMPs.map((mp, i) => {
     const known    = KNOWN.find(k => k.messpunktNr === mp || mp.includes(k.messpunktNr) || k.messpunktNr.includes(mp));
-    const typ      = known?.typ      || 'Verbrauch';
+    const virt     = AppState.virtualMPs.includes(mp);
+    const typ      = virt ? 'ignore' : (known?.typ || 'Verbrauch');
     const label    = known?.label    || '';
     const adresse  = known?.adresse  || '';
     const zaehlerNr = known?.zaehlerNr || '';
@@ -125,7 +139,8 @@ function buildMeterConfig() {
     return `
     <div class="meter-cfg-card" id="card_${i}">
       <button class="mp-delete-btn" title="Messpunkt entfernen" type="button">×</button>
-      ${known ? '<span class="found-badge">✓ Bekannt</span>' : ''}
+      ${virt ? '<span class="found-badge virt">⚠ Virtueller Summenzählpunkt</span>'
+             : known ? '<span class="found-badge">✓ Bekannt</span>' : ''}
       <div class="mpid">${mp}</div>
       <div class="cfg-row">
         <div style="flex:0 0 130px">
@@ -134,7 +149,7 @@ function buildMeterConfig() {
             <select id="typ_${i}">
               <option value="Verbrauch"  ${typ === 'Verbrauch'  ? 'selected' : ''}>↓ Verbrauch</option>
               <option value="Produktion" ${typ === 'Produktion' ? 'selected' : ''}>☀ Produktion</option>
-              <option value="ignore">— Ignorieren</option>
+              <option value="ignore"     ${typ === 'ignore'     ? 'selected' : ''}>— Ignorieren</option>
             </select>
           </div>
         </div>

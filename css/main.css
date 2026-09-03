@@ -389,6 +389,11 @@ main {
   text-transform: uppercase;
 }
 
+.found-badge.virt {
+  background: var(--amber-light, #FDF3E0);
+  color: #8A5A00;
+}
+
 .meter-stats {
   font-size: .72rem;
   color: var(--text-muted);
