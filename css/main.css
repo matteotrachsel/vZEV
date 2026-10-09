@@ -99,6 +99,23 @@ nav {
   text-transform: uppercase;
 }
 
+/* Deployment-Stand (js/version.js) – direkt neben dem Badge */
+.nav-version {
+  margin-left: -1.75rem;
+  color: rgba(255,255,255,.75);
+  font-size: .72rem;
+  font-weight: 600;
+  padding: .2rem .6rem;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: var(--radius);
+  white-space: nowrap;
+  cursor: help;
+  font-variant-numeric: tabular-nums;
+}
+.nav-version.preview { color: #FFD58A; border-color: rgba(255,213,138,.5); }
+
+.footer-version { margin-top: .35rem; font-size: .68rem; color: rgba(255,255,255,.35); font-variant-numeric: tabular-nums; }
+
 /* ── PAGE HEADER ────────────────────────────────────────────────────────── */
 .page-header {
   background: var(--surface);
@@ -576,6 +593,11 @@ tr.tfoot td {
   .nav-badge {
     font-size: .62rem;
     padding: .15rem .45rem;
+  }
+  .nav-version {
+    margin-left: -.35rem;
+    font-size: .62rem;
+    padding: .15rem .4rem;
   }
   .nav-logo-text { font-size: 1.1rem; }
   .nav-logo-mark svg { width: 26px; height: 26px; }
