@@ -15,9 +15,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (e) { /* file:// oder offline */ }
 
   if (!v?.builtAt) {
-    badge.textContent  = 'Lokale Version';
+    // Lokal geöffnet oder auf einem Hosting ohne Build-Schritt (z. B. GitHub Pages).
+    const local = location.protocol === 'file:' || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+    const label = local ? 'Lokale Version' : 'Stand unbekannt';
+    badge.textContent  = label;
     badge.title        = 'Kein Deployment-Stand verfügbar (version.json fehlt).';
-    footer.textContent = 'Lokale Version';
+    footer.textContent = label;
     return;
   }
 
