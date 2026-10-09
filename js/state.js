@@ -4,6 +4,7 @@
 const AppState = {
   parsedData:  [],   // array of { messpunkt, datum, bezug, einspeisung }
   detectedMPs: [],   // array of unique messpunktNr strings from the uploaded file
+  virtualMPs:  [],   // messpunktNr of virtual vZEV summation points (auto-ignored)
   charts: {
     monthly:    null,   // Chart.js instance – monthly bar chart
     pie:        null,   // Chart.js instance – energy distribution pie
