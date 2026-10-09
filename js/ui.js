@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function setupStaticHandlers() {
   document.getElementById('calculateBtn').addEventListener('click', calculateAndRender);
   document.getElementById('exportBtn').addEventListener('click', exportCSV);
-  document.getElementById('pdfBtn').addEventListener('click', exportPDF);
+  document.getElementById('pdfBtn').addEventListener('click', openInvoiceWizard);
 }
 
 // ── Wizard step indicator ─────────────────────────────────────────────────────
@@ -223,17 +223,4 @@ function getTariff() {
   const feedIn      = parseFloat(document.getElementById('feedInPrice').value) / 100;  // CHF/kWh feed-in
   const konzession  = parseFloat(document.getElementById('konzession').value)  / 100;  // CHF/kWh Gemeinde-Konzessionsabgabe
   return { energyAllIn, vzevPrice, grundtarif, feedIn, konzession };
-}
-
-// ── Invoice header config ─────────────────────────────────────────────────────
-
-function getInvoiceHeader() {
-  return {
-    name:        document.getElementById('invSenderName')?.value.trim()    || 'vZEV Zusammenschluss',
-    street:      document.getElementById('invSenderStreet')?.value.trim()  || '',
-    city:        document.getElementById('invSenderCity')?.value.trim()    || '',
-    contact:     document.getElementById('invSenderContact')?.value.trim() || '',
-    iban:        document.getElementById('invIBAN')?.value.trim()          || '',
-    paymentTerm: document.getElementById('invPaymentTerm')?.value.trim()   || '30 Tage'
-  };
 }
