@@ -38,16 +38,20 @@ function invoiceParticipants(result) {
     const pool = round1(sum('vzev') - sum('own'));
 
     const lines = [];
-    const add = (label, qty, unit, price, amount) => lines.push({ label, qty, unit, price, amount: round2(amount) });
+    const add = (label, qty, unit, price, amount, note) => lines.push({ label, qty, unit, price, amount: round2(amount), note });
+    // Solarstrom kostet einen festen Anteil des Einheitstarifs – unter der Position ausweisen.
+    const solarNote = Number.isFinite(tariff.vzevShare)
+      ? `${tariff.vzevShare.toLocaleString('de-CH')} % des Einheitstarifs von ${(tariff.energyAllIn * 100).toFixed(2)} Rp./kWh`
+      : '';
     add('Grundtarif', `${mc} ${mc === 1 ? 'Monat' : 'Monate'}`, '', `${(tariff.grundtarif * 12).toFixed(2)} CHF/Jahr`, mc * tariff.grundtarif);
     add('Energie Einheitstarif (Netzbezug)', fmtKwh(grid), 'kWh', `${(tariff.energyAllIn * 100).toFixed(2)} Rp./kWh`, grid * tariff.energyAllIn);
-    if (own >= 0.05) add('Eigenverbrauch eigene PV-Anlage', fmtKwh(own), 'kWh', `${(tariff.vzevPrice * 100).toFixed(2)} Rp./kWh`, own * tariff.vzevPrice);
+    if (own >= 0.05) add('Eigenverbrauch eigene PV-Anlage', fmtKwh(own), 'kWh', `${(tariff.vzevPrice * 100).toFixed(2)} Rp./kWh`, own * tariff.vzevPrice, solarNote);
     // Beim Produzenten ohne Bezug aus dem Pool keine Nullzeile ausweisen.
-    if (pool >= 0.05 || own < 0.05) add('Solarstrom vom vZEV', fmtKwh(pool), 'kWh', `${(tariff.vzevPrice * 100).toFixed(2)} Rp./kWh`, pool * tariff.vzevPrice);
+    if (pool >= 0.05 || own < 0.05) add('Solarstrom vom vZEV', fmtKwh(pool), 'kWh', `${(tariff.vzevPrice * 100).toFixed(2)} Rp./kWh`, pool * tariff.vzevPrice, solarNote);
     add('Konzessionsabgabe Gemeinde (auf Netzbezug)', fmtKwh(grid), 'kWh', `${(tariff.konzession * 100).toFixed(2)} Rp./kWh`, grid * tariff.konzession);
 
     const total = round2(lines.reduce((s, l) => s + l.amount, 0));
-    return { m, rows, cons, grid, own, pool, lines, total };
+    return { m, rows, cons, grid, own, pool, lines, total, tariff };
   });
 }
 
@@ -193,6 +197,14 @@ function drawInvoicePage(doc, p, ctx) {
     doc.text(l.qty,   cQ, y, { align: 'right' });
     doc.text(l.price, cP, y, { align: 'right' });
     doc.text(fmtCHF(l.amount), MR, y, { align: 'right' });
+    if (l.note) {
+      doc.setFontSize(7);
+      doc.setTextColor(...GRAY);
+      doc.text(l.note, ML, y + 3.4);
+      doc.setFontSize(8.5);
+      doc.setTextColor(...BLACK);
+      y += 3;
+    }
     y += 5.6;
   });
 
@@ -348,7 +360,11 @@ function drawDetailsPage(doc, p, ctx) {
     'Grundlage sind die 15-Minuten-Messwerte des Netzbetreibers. In jedem Intervall deckt die PV-Anlage zuerst ' +
     'den Verbrauch am eigenen Anschluss (Eigenverbrauch). Der verbleibende Solarstrom wird im Verhältnis zum ' +
     'Verbrauch auf alle Teilnehmenden des Zusammenschlusses verteilt. Was nicht durch Solarstrom gedeckt ist, ' +
-    'wird als Netzbezug zum Einheitstarif verrechnet; die Konzessionsabgabe fällt nur auf den Netzbezug an.';
+    'wird als Netzbezug zum Einheitstarif verrechnet; die Konzessionsabgabe fällt nur auf den Netzbezug an.' +
+    (Number.isFinite(p.tariff?.vzevShare)
+      ? ` Solarstrom wird zu ${p.tariff.vzevShare.toLocaleString('de-CH')} % des Einheitstarifs verrechnet ` +
+        `(${(p.tariff.vzevPrice * 100).toFixed(2)} statt ${(p.tariff.energyAllIn * 100).toFixed(2)} Rp./kWh).`
+      : '');
   doc.splitTextToSize(txt, MR - ML).forEach(l => { doc.text(l, ML, y); y += 4; });
 
   drawFooter(doc, ctx, 2);
