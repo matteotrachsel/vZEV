@@ -54,6 +54,8 @@ function extractTariffs(json, opts = {}) {
         && +t.customerVoltageLevel === o.voltageLevel && flatEnergy(t) != null, `Netztarif "${o.gridTariff}"`);
       const meter = one(t => t.tariffType === 'metering' && t.tariffName.startsWith(o.metering)
         && +t.customerVoltageLevel === o.voltageLevel, `Messtarif "${o.metering}"`);
+      const virt = inYear.find(t => t.tariffType === 'metering' && t.tariffName.startsWith('Virtuelle Messstelle')
+        && +t.customerVoltageLevel === o.voltageLevel);
 
       // Konzessionsabgabe der Gemeinde – Einträge für Zweitzähler ausschliessen.
       let konz = null;
@@ -70,6 +72,15 @@ function extractTariffs(json, opts = {}) {
       const energyRp = flatEnergy(energy) * 100;
       const gridRp   = flatEnergy(grid) * 100;
       const baseChfMonth = (energy.prices.base?.price || 0) + (grid.prices.base?.price || 0) + (meter.prices.base?.price || 0);
+      // Monatspreise sind auf 4 Stellen gerundet (6.5833) → zuerst auf CHF/Jahr runden (79.00).
+      const perYear = m => round((m || 0) * 12, 2);
+      const inclVat = y => round(y * (1 + o.vat), 2);
+      const baseY = {
+        energy:   perYear(energy.prices.base?.price),
+        grid:     perYear(grid.prices.base?.price),
+        metering: perYear(meter.prices.base?.price),
+        virtual:  virt ? perYear(virt.prices.base?.price) : null
+      };
 
       out[year] = {
         validFrom: String(energy.startDate).slice(0, 10),
@@ -78,6 +89,14 @@ function extractTariffs(json, opts = {}) {
         energyAllInRp:  round((energyRp + gridRp) * (1 + o.vat), 2),
         grundtarifChfY: round(baseChfMonth * 12 * (1 + o.vat), 2),
         konzessionRp:   konz ? round(konz.price * 100 * (1 + o.vat), 2) : null,
+        // Fixkosten, wie BKW sie dem vZEV als Ganzes verrechnet (CHF/Jahr inkl. MWSt.):
+        // Grundpreise Energie + Netz einmal pro vZEV, Messung pro physischem Zähler,
+        // dazu die virtuelle Messstelle des Zusammenschlusses.
+        fixedChfY: {
+          base:          inclVat(baseY.energy + baseY.grid),
+          meterPerUnit:  inclVat(baseY.metering),
+          virtualMeter:  baseY.virtual != null ? inclVat(baseY.virtual) : null
+        },
         // Bausteine exkl. MWSt. zur Nachvollziehbarkeit
         parts: {
           energyRp: round(energyRp, 4),
@@ -87,6 +106,7 @@ function extractTariffs(json, opts = {}) {
             grid:     grid.prices.base?.price || 0,
             metering: meter.prices.base?.price || 0
           },
+          baseChfYear: baseY,
           konzessionRp: konz ? round(konz.price * 100, 4) : null,
           municipality: konz ? `${konz.name} (${o.municipality})` : null,
           vat: o.vat

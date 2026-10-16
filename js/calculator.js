@@ -1,12 +1,65 @@
 // ── CALCULATOR ────────────────────────────────────────────────────────────────
 // vZEV distribution algorithm and main orchestrator.
 
-function getMonthCount() {
-  if (!AppState.parsedData.length) return 1;
-  const ts = AppState.parsedData.map(r => r.datum.getTime());
-  const a  = new Date(Math.min(...ts));
-  const b  = new Date(Math.max(...ts));
-  return Math.max(1, (b.getFullYear() - a.getFullYear()) * 12 + b.getMonth() - a.getMonth() + 1);
+// ── Grundkosten (Fixkosten) des Zusammenschlusses ─────────────────────────────
+// BKW verrechnet dem vZEV als Ganzes: Grundpreise Energie + Netz einmal, Messung
+// pro physischem Zähler und die virtuelle Messstelle – pro Tag (Jahrespreis/365).
+// Aufteilung auf die Teilnehmenden (Verbrauchs-Messpunkte):
+//   equal  – alles gleichmässig (unter Eigentümern frei vereinbar)
+//   tenant – Messung gleichmässig, Grundpreise nach Netzbezug; Art. 16a Abs. 2 EnV
+//            verlangt bei Mietern eine verbrauchsabhängige Verrechnung der externen
+//            Kosten, ausgenommen die Messung des Zusammenschlusses.
+
+// Kalendertage zwischen zwei Zeitpunkten, beide Tage eingeschlossen.
+function calendarDays(a, b) {
+  const da = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate());
+  const db = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate());
+  return Math.max(0, Math.round((db - da) / 864e5) + 1);
+}
+
+// Physische Zähler: unterschiedliche Zählernummern der konfigurierten Messpunkte
+// (PV und Verbrauch am selben Anschluss teilen sich einen Zähler).
+function physicalMeterCount(meters) {
+  const ids = new Set(meters.map(m => m.zaehlerNr ? 'z:' + m.zaehlerNr : 'mp:' + m.messpunktNr));
+  return ids.size;
+}
+
+function allocateFixedCosts(agg, meters, tariff, periodStart, periodEnd) {
+  const f        = tariff.fixed;
+  const cons     = meters.filter(m => m.typ === 'Verbrauch');
+  const nMeters  = physicalMeterCount(meters);
+  const days     = calendarDays(periodStart, periodEnd);
+  const perYear  = { base: f.base, meter: f.meter * nMeters, virtual: f.virtual };
+  const yearTotal = perYear.base + perYear.meter + perYear.virtual;
+
+  const baseTotal = perYear.base * days / 365;
+  const messTotal = (perYear.meter + perYear.virtual) * days / 365;
+
+  const gridOf  = m => Object.values(agg[m.messpunktNr] || {}).reduce((s, d) => s + d.grid, 0);
+  const grids   = cons.map(gridOf);
+  const gridSum = grids.reduce((s, g) => s + g, 0);
+  const n       = cons.length || 1;
+
+  const per = {};
+  cons.forEach((m, i) => {
+    const baseShare = f.split === 'tenant' && gridSum > 0 ? grids[i] / gridSum : 1 / n;
+    const messShare = 1 / n;
+    per[m.messpunktNr] = {
+      baseShare, messShare,
+      base: baseTotal * baseShare,
+      mess: messTotal * messShare
+    };
+  });
+
+  // Fixkosten des vZEV pro Monat (Tage des Monats innerhalb der Periode).
+  const monthFee = mk => {
+    const [y, mo] = mk.split('-').map(Number);
+    const from = new Date(Math.max(new Date(y, mo - 1, 1), periodStart));
+    const to   = new Date(Math.min(new Date(y, mo, 0, 23, 59), periodEnd));
+    return yearTotal * (to >= from ? calendarDays(from, to) : 0) / 365;
+  };
+
+  return { split: f.split, days, nMeters, nParticipants: cons.length, perYear, yearTotal, baseTotal, messTotal, per, monthFee };
 }
 
 function calculateAndRender() {
@@ -135,13 +188,14 @@ function calculateAndRender() {
     `${fmt(periodStart)} – ${fmt(periodEnd)}`;
 
   // Persist result so invoice generator can access it without recalculating.
-  AppState.lastResult = { agg, monthly, tot, scRate, ssRate, meters, tariff, distStats, periodStart, periodEnd };
+  const fixed = allocateFixedCosts(agg, meters, tariff, periodStart, periodEnd);
+  AppState.lastResult = { agg, monthly, tot, scRate, ssRate, meters, tariff, distStats, periodStart, periodEnd, fixed };
 
   // ── Render all sections ───────────────────────────────────────────────────
   renderSummary(tot, scRate, ssRate);
-  renderMonthly(monthly, tariff, consMeters.length);
+  renderMonthly(monthly, tariff, fixed);
   renderMeterAgg(agg, meters, distStats);
-  renderCosts(agg, meters, tariff);
+  renderCosts(agg, meters, tariff, fixed);
   renderCharts(monthly, consMeters, agg);
   renderDayProfile(byTS, meters);
   renderTimeline(byTS, meters);

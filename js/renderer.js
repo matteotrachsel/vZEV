@@ -11,7 +11,7 @@ function renderSummary(tot, scRate, ssRate) {
     <div class="sum-card r"><div class="slabel">Netzeinspeisung</div>    <div class="sval">${tot.fi.toFixed(0)}</div><div class="sunit">kWh Überschuss</div></div>`;
 }
 
-function renderMonthly(monthly, tariff, nV) {
+function renderMonthly(monthly, tariff, fixed) {
   const months = Object.keys(monthly).sort();
   const ep = `${(tariff.energyAllIn * 100).toFixed(2)} Rp`;
   const vp = `${(tariff.vzevPrice   * 100).toFixed(2)} Rp`;
@@ -38,7 +38,7 @@ function renderMonthly(monthly, tariff, nV) {
     const eb   = d.grid * tariff.energyAllIn;           // Energiebezug cost
     const vz   = d.vzev * tariff.vzevPrice;             // vZEV solar cost
     const kz   = d.grid * tariff.konzession;            // Konzessionsabgabe (nur auf Netzbezug/Einheitstarif)
-    const fee  = nV * tariff.grundtarif; // monthly fees (all meters)
+    const fee  = fixed.monthFee(mk);                    // Grundkosten des vZEV in diesem Monat
     const fi   = d.fi * tariff.feedIn;                  // feed-in revenue
     const total = eb + vz + kz + fee - fi;
     sC+=d.cons; sP+=d.prod; sV+=d.vzev; sG+=d.grid;
@@ -117,8 +117,7 @@ function renderMeterAgg(agg, meters, distStats) {
   }).join('');
 }
 
-function renderCosts(agg, meters, tariff) {
-  const mc = getMonthCount();
+function renderCosts(agg, meters, tariff, fixed) {
   const cM = meters.filter(m => m.typ === 'Verbrauch');
   const ep = `${(tariff.energyAllIn * 100).toFixed(2)} Rp`;
   const vp = `${(tariff.vzevPrice   * 100).toFixed(2)} Rp`;
@@ -145,18 +144,17 @@ function renderCosts(agg, meters, tariff) {
     Object.values(agg[m.messpunktNr] || {}).forEach(d => { v += d.vzev; });
     return v;
   });
-  const totalFee = mc * tariff.grundtarif;
-
-  let aG = 0, aV = 0, aT = 0;
+  let aG = 0, aV = 0, aF = 0, aT = 0;
   const rows = cM.map((m, i) => {
     const g   = meterGrid[i];
     const v   = meterVzev[i];
     const eb  = g * tariff.energyAllIn;
     const vz  = v * tariff.vzevPrice;
     const kz  = g * tariff.konzession; // nur auf Netzbezug, nicht auf vZEV-Solar
-    const fee = totalFee;
+    const fx  = fixed.per[m.messpunktNr] || { base: 0, mess: 0 };
+    const fee = fx.base + fx.mess;
     const total = eb + vz + kz + fee;
-    aG += g; aV += v; aT += total;
+    aG += g; aV += v; aF += fee; aT += total;
     return `<tr>
       <td><div style="font-weight:700;color:var(--text)">${m.label || m.messpunktNr}</div>
           ${m.adresse   ? `<div style="font-size:.72rem;color:var(--text-muted)">${m.adresse}</div>` : ''}
@@ -172,7 +170,8 @@ function renderCosts(agg, meters, tariff) {
   rows.push(`<tr class="tfoot"><td>Total</td>
     <td class="tr">${aG.toFixed(1)}</td>
     <td class="tr">${aV.toFixed(1)}</td>
-    <td class="tr">–</td><td class="tr">–</td><td class="tr">–</td><td class="tr">–</td>
+    <td class="tr">–</td><td class="tr">–</td><td class="tr">–</td>
+    <td class="tr">${fmtCHF(aF)}</td>
     <td class="tr tc">${fmtCHF(aT)}</td></tr>`);
   document.querySelector('#costTable tbody').innerHTML = rows.join('');
 }
