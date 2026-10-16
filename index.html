@@ -149,11 +149,6 @@
         <div class="suffix">Rp/kWh · inkl. MWSt.</div>
       </div>
       <div class="tfield">
-        <label>Grundtarif BKW <span class="tariff-year">2026</span></label>
-        <input type="number" id="grundtarif" value="231.33" step="0.01" min="0">
-        <div class="suffix">CHF/Jahr pro Messtelle inkl. MWSt.</div>
-      </div>
-      <div class="tfield">
         <label>Rückliefervergütung BKW</label>
         <input type="number" id="feedInPrice" value="6.00" step="0.01" min="0">
         <div class="suffix">Rp/kWh · Stand Q2 2026 (Mindestvergütung) · wird quartalsweise publiziert <span style="color:var(--amber);font-weight:700">· ggf. anpassen</span></div>
@@ -174,6 +169,34 @@
         <div class="suffix">Rp/kWh · nur auf Netzbezug (Einheitstarif) inkl. MWSt.</div>
       </div>
     </div>
+
+    <div class="tariff-subhead">Grundkosten des Zusammenschlusses <span>· effektive BKW-Kosten <span class="tariff-year">2026</span>, inkl. MWSt.</span></div>
+    <div class="tariff-grid">
+      <div class="tfield">
+        <label>Grundpreise Energie + Netz</label>
+        <input type="number" id="fixBase" value="145.94" step="0.01" min="0">
+        <div class="suffix">CHF/Jahr · einmal pro vZEV</div>
+      </div>
+      <div class="tfield">
+        <label>Messung pro Zähler</label>
+        <input type="number" id="fixMeter" value="85.40" step="0.01" min="0">
+        <div class="suffix">CHF/Jahr · Niederspannung ohne Wandler · Anzahl Zähler aus der Messpunkt-Konfiguration</div>
+      </div>
+      <div class="tfield">
+        <label>Virtuelle Messung</label>
+        <input type="number" id="fixVirtual" value="16.22" step="0.01" min="0">
+        <div class="suffix">CHF/Jahr · einmal pro vZEV</div>
+      </div>
+      <div class="tfield">
+        <label>Aufteilung</label>
+        <select id="fixSplit" class="tselect">
+          <option value="equal" selected>Gleichmässig</option>
+          <option value="tenant">Mieter-konform (Grundpreise nach Netzbezug)</option>
+        </select>
+        <div class="suffix">Gleichmässig: alles zu gleichen Teilen. Mieter-konform: Messung gleichmässig, Grundpreise nach Netzbezug (Art. 16a EnV). Im vZEV-Vertrag festhalten.</div>
+      </div>
+    </div>
+
     <div id="tariffSource" class="tariff-source">BKW-Tarife werden geladen…</div>
     <p style="margin-top:.5rem;font-size:.73rem;color:var(--text-muted);font-weight:500">
       Die Rückliefervergütung ist nicht in den BKW-Tarifen enthalten und wird erst nach dem Quartal publiziert – bitte jeweils aktualisieren.

@@ -489,6 +489,17 @@ main {
 .tfield input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,70,176,.1); }
 .tfield .suffix { font-size: .72rem; color: var(--text-muted); font-weight: 500; margin-top: .3rem; }
 
+.tariff-subhead {
+  margin: 1.5rem 0 .9rem; padding-top: 1.1rem; border-top: 1px solid var(--border-light);
+  font-size: .78rem; font-weight: 800; color: var(--text-mid); text-transform: uppercase; letter-spacing: .05em;
+}
+.tariff-subhead span { text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--text-muted); }
+.tselect {
+  width: 100%; padding: .55rem .6rem; border: 1px solid var(--border); border-radius: var(--radius);
+  font-size: .82rem; font-family: 'Manrope', sans-serif; font-weight: 600; color: var(--text); background: var(--surface);
+}
+.tselect:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,70,176,.1); }
+
 .tariff-source {
   margin-top: 1rem; padding: .55rem .8rem; border-left: 3px solid var(--border);
   background: var(--blue-xlight); font-size: .74rem; line-height: 1.55; color: var(--text-mid); font-weight: 500;

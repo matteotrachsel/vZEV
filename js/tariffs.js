@@ -27,19 +27,24 @@ function applyBkwTariffs(year, note = '') {
 
   if (y && !y.error) {
     set('energyAllIn', y.energyAllInRp);
-    set('grundtarif',  y.grundtarifChfY);
     set('konzession',  y.konzessionRp);
+    if (y.fixedChfY) {
+      set('fixBase',    y.fixedChfY.base);
+      set('fixMeter',   y.fixedChfY.meterPerUnit);
+      set('fixVirtual', y.fixedChfY.virtualMeter);
+    }
     if (typeof syncVzevPrice === 'function') syncVzevPrice();
     Tariffs.year = year;
     setTariffYearLabels(year);
 
-    const p = y.parts, b = p.baseChfMonth;
+    const p = y.parts, b = p.baseChfYear || {};
     const stand = Tariffs.data.lastModified
       ? ` · Stand BKW ${new Date(Tariffs.data.lastModified).toLocaleDateString('de-CH')}` : '';
     setTariffSource('ok',
       `<strong>BKW-Tarife ${year} geladen</strong>${stand}. ` +
       `Einheitstarif = (Energie ${p.energyRp.toFixed(2)} + Netz ${p.gridRp.toFixed(2)} Rp.) × ${(1 + p.vat).toFixed(3)} MWSt.; ` +
-      `Grundtarif = (${b.energy} + ${b.grid} + Messung ${b.metering}) CHF/Monat × 12 × ${(1 + p.vat).toFixed(3)}` +
+      `Grundpreise = (Energie ${b.energy} + Netz ${b.grid}) CHF/Jahr, Messung ${b.metering} CHF/Jahr pro Zähler` +
+      (b.virtual != null ? `, virtuelle Messung ${b.virtual} CHF/Jahr` : '') + `, jeweils × ${(1 + p.vat).toFixed(3)}` +
       (p.municipality && p.konzessionRp != null
         ? `; Konzession ${p.municipality} ${p.konzessionRp.toFixed(2)} Rp. × ${(1 + p.vat).toFixed(3)}.` : '.') +
       ' Die Netznutzung enthält bereits Systemdienstleistungen, Stromreserve und die gesetzliche Förderabgabe.' +

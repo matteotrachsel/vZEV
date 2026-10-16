@@ -25,8 +25,10 @@ const fmtKwh = v => `${v.toLocaleString('de-CH', { minimumFractionDigits: 1, max
 // Mengen werden auf 0.1 kWh, Beträge pro Zeile auf Rappen gerundet und das
 // Total aus den gerundeten Zeilen gebildet – so ist jede Zeile nachrechenbar.
 function invoiceParticipants(result) {
-  const { agg, meters, tariff } = result;
-  const mc = getMonthCount();
+  const { agg, meters, tariff, fixed } = result;
+  const pct = s => `${(s * 100).toLocaleString('de-CH', { maximumFractionDigits: 1 })} %`;
+  const chfY = v => `${fmtCHF(v)} CHF/Jahr`;
+  const nP = fixed.nParticipants;
 
   return meters.filter(m => m.typ === 'Verbrauch').map(m => {
     const months = Object.keys(agg[m.messpunktNr] || {}).sort();
@@ -43,7 +45,14 @@ function invoiceParticipants(result) {
     const solarNote = Number.isFinite(tariff.vzevShare)
       ? `${tariff.vzevShare.toLocaleString('de-CH')} % des Einheitstarifs von ${(tariff.energyAllIn * 100).toFixed(2)} Rp./kWh`
       : '';
-    add('Grundtarif', `${mc} ${mc === 1 ? 'Monat' : 'Monate'}`, '', `${(tariff.grundtarif * 12).toFixed(2)} CHF/Jahr`, mc * tariff.grundtarif);
+    // Grundkosten: effektive BKW-Kosten des vZEV, Anteil dieses Teilnehmers.
+    const fx = fixed.per[m.messpunktNr];
+    const evenly = `gleichmässig auf ${nP} Teilnehmende`;
+    add('Grundpreise BKW (Energie + Netz)', `${fixed.days} Tage · ${pct(fx.baseShare)}`, '', chfY(fixed.perYear.base), fx.base,
+      `Kosten des Zusammenschlusses, ${fixed.split === 'tenant' ? 'nach Anteil am Netzbezug' : evenly}`);
+    add(`Messung BKW (${fixed.nMeters} Zähler + virtuelle Messung)`, `${fixed.days} Tage · ${pct(fx.messShare)}`, '',
+      chfY(fixed.perYear.meter + fixed.perYear.virtual), fx.mess,
+      `${fixed.nMeters} × ${fmtCHF(tariff.fixed.meter)} + ${fmtCHF(tariff.fixed.virtual)} CHF/Jahr, ${evenly}`);
     add('Energie Einheitstarif (Netzbezug)', fmtKwh(grid), 'kWh', `${(tariff.energyAllIn * 100).toFixed(2)} Rp./kWh`, grid * tariff.energyAllIn);
     if (own >= 0.05) add('Eigenverbrauch eigene PV-Anlage', fmtKwh(own), 'kWh', `${(tariff.vzevPrice * 100).toFixed(2)} Rp./kWh`, own * tariff.vzevPrice, solarNote);
     // Beim Produzenten ohne Bezug aus dem Pool keine Nullzeile ausweisen.
@@ -51,7 +60,7 @@ function invoiceParticipants(result) {
     add('Konzessionsabgabe Gemeinde (auf Netzbezug)', fmtKwh(grid), 'kWh', `${(tariff.konzession * 100).toFixed(2)} Rp./kWh`, grid * tariff.konzession);
 
     const total = round2(lines.reduce((s, l) => s + l.amount, 0));
-    return { m, rows, cons, grid, own, pool, lines, total, tariff };
+    return { m, rows, cons, grid, own, pool, lines, total, tariff, split: fixed.split };
   });
 }
 
@@ -364,7 +373,12 @@ function drawDetailsPage(doc, p, ctx) {
     (Number.isFinite(p.tariff?.vzevShare)
       ? ` Solarstrom wird zu ${p.tariff.vzevShare.toLocaleString('de-CH')} % des Einheitstarifs verrechnet ` +
         `(${(p.tariff.vzevPrice * 100).toFixed(2)} statt ${(p.tariff.energyAllIn * 100).toFixed(2)} Rp./kWh).`
-      : '');
+      : '') +
+    ' Die Grundkosten entsprechen dem, was die BKW dem Zusammenschluss effektiv verrechnet (Grundpreise einmal ' +
+    'pro vZEV, Messung pro Zähler und virtuelle Messung), und werden ' +
+    (p.split === 'tenant'
+      ? 'bei der Messung gleichmässig, bei den Grundpreisen nach Anteil am Netzbezug aufgeteilt.'
+      : 'gleichmässig auf die Teilnehmenden aufgeteilt.');
   doc.splitTextToSize(txt, MR - ML).forEach(l => { doc.text(l, ML, y); y += 4; });
 
   drawFooter(doc, ctx, 2);

@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
   syncVzevPrice();
 
   // Auto-recalculate when tariff inputs change (only if data is loaded).
-  document.querySelectorAll('#feedInPrice,#grundtarif,#energyAllIn,#vzevPrice,#vzevShare,#konzession')
+  document.querySelectorAll('#feedInPrice,#fixBase,#fixMeter,#fixVirtual,#fixSplit,#energyAllIn,#vzevPrice,#vzevShare,#konzession')
     .forEach(el => el.addEventListener('change', () => {
       syncVzevPrice();
       if (AppState.parsedData.length) calculateAndRender();
@@ -221,8 +221,15 @@ function getTariff() {
   const energyAllIn = parseFloat(document.getElementById('energyAllIn').value) / 100;  // CHF/kWh all-in
   const vzevPrice   = parseFloat(document.getElementById('vzevPrice').value)   / 100;  // CHF/kWh internal solar (vzevShare % of energyAllIn)
   const vzevShare   = parseFloat(document.getElementById('vzevShare').value);          // % vom Einheitstarif – wird auf der Rechnung ausgewiesen
-  const grundtarif  = parseFloat(document.getElementById('grundtarif').value) / 12;    // CHF/Jahr → CHF/Monat
+  const num = id => parseFloat(document.getElementById(id).value) || 0;
+  // Grundkosten des vZEV als Ganzes (CHF/Jahr inkl. MWSt.), aufgeteilt in calculator.js
+  const fixed = {
+    base:    num('fixBase'),     // Grundpreise Energie + Netz, einmal pro vZEV
+    meter:   num('fixMeter'),    // Messung pro physischem Zähler
+    virtual: num('fixVirtual'),  // virtuelle Messstelle des vZEV
+    split:   document.getElementById('fixSplit').value === 'tenant' ? 'tenant' : 'equal'
+  };
   const feedIn      = parseFloat(document.getElementById('feedInPrice').value) / 100;  // CHF/kWh feed-in
   const konzession  = parseFloat(document.getElementById('konzession').value)  / 100;  // CHF/kWh Gemeinde-Konzessionsabgabe
-  return { energyAllIn, vzevPrice, grundtarif, feedIn, konzession, vzevShare };
+  return { energyAllIn, vzevPrice, fixed, feedIn, konzession, vzevShare };
 }
