@@ -60,7 +60,9 @@ function invoiceParticipants(result) {
     add('Konzessionsabgabe Gemeinde (auf Netzbezug)', fmtKwh(grid), 'kWh', `${(tariff.konzession * 100).toFixed(2)} Rp./kWh`, grid * tariff.konzession);
 
     const total = round2(lines.reduce((s, l) => s + l.amount, 0));
-    return { m, rows, cons, grid, own, pool, lines, total, tariff, split: fixed.split };
+    const prof = result.dayProfile?.meters?.[m.messpunktNr];
+    const profile = prof ? { cons: prof.cons, solar: prof.solar, pv: result.dayProfile.pv } : null;
+    return { m, rows, cons, grid, own, pool, lines, total, tariff, split: fixed.split, profile };
   });
 }
 
@@ -356,6 +358,13 @@ function drawDetailsPage(doc, p, ctx) {
   doc.setFillColor(...INV.BLUE); doc.rect(ML + 50, y - 2.6, 3, 3, 'F');
   doc.text(`Netzbezug ${((1 - share) * 100).toFixed(1)} %`, ML + 55, y);
 
+  // Tagesverlauf – nur wenn danach noch Platz für die Erklärung bleibt.
+  if (p.profile) {
+    const room = 262 - (y + 12);                 // Platz bis über den Erklärtext
+    const h = Math.min(52, room - 22);
+    if (h >= 32) y = drawDayProfileChart(doc, p.profile, y + 12, h);
+  }
+
   // Methode
   y += 12;
   doc.setFont('helvetica', 'bold');
@@ -382,6 +391,116 @@ function drawDetailsPage(doc, p, ctx) {
   doc.splitTextToSize(txt, MR - ML).forEach(l => { doc.text(l, ML, y); y += 4; });
 
   drawFooter(doc, ctx, 2);
+}
+
+// ── Grafik: Tagesverlauf ──────────────────────────────────────────────────────
+// Ø 15-Minuten-Profil über die Periode. Linke Achse: Verbrauch des Teilnehmers
+// mit dem zugeteilten Solarstrom als Fläche. Rechte Achse: PV-Produktion des
+// vZEV – sie ist um ein Vielfaches grösser und würde den Verbrauch sonst zur
+// Nulllinie drücken. Beide Achsen haben 4 Intervalle, damit die Rasterlinien
+// für beide gelten.
+
+// "Schöne" Schrittweite (1, 2, 2.5, 5 × 10^n), sodass 4 Schritte max überdecken.
+function niceStep(max) {
+  if (!(max > 0)) return 0.25;
+  const raw = max / 4, mag = 10 ** Math.floor(Math.log10(raw));
+  return [1, 2, 2.5, 5, 10].map(f => f * mag).find(s => s >= raw);
+}
+
+function drawDayProfileChart(doc, prof, top, height) {
+  const { ML, MR, BLACK, GRAY, LGRAY, BLUE, GREEN } = INV;
+  const AMBER = [230, 144, 10];
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(...BLACK);
+  doc.text('Tagesverlauf · Ø 15-Minuten-Profil', ML, top);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(...GRAY);
+  doc.text('Durchschnitt pro Viertelstunde über den Bezugszeitraum, in kWh', ML, top + 3.8);
+
+  const px = ML + 11, pw = MR - 12 - px;
+  const py = top + 11, ph = height;
+  const n  = prof.cons.length;
+
+  const lStep = niceStep(Math.max(...prof.cons, ...prof.solar)), lMax = lStep * 4;
+  const rStep = niceStep(Math.max(...prof.pv)),                    rMax = rStep * 4;
+  const xOf  = i => px + ((i + 0.5) / n) * pw;
+  const yL   = v => py + ph - (v / lMax) * ph;
+  const yR   = v => py + ph - (v / rMax) * ph;
+  const fmtTick = (v, s) => v.toFixed(s >= 1 ? 0 : s >= 0.1 ? (Math.round(s * 10) === s * 10 ? 1 : 2) : (Math.round(s * 100) === s * 100 ? 2 : 3));
+
+  // Raster + Achsenbeschriftung
+  doc.setLineWidth(0.15);
+  doc.setFontSize(6.5);
+  for (let k = 0; k <= 4; k++) {
+    const yy = py + ph - (k / 4) * ph;
+    doc.setDrawColor(225, 225, 225);
+    doc.line(px, yy, px + pw, yy);
+    doc.setTextColor(...BLUE);
+    doc.text(fmtTick(lStep * k, lStep), px - 1.5, yy + 1, { align: 'right' });
+    doc.setTextColor(...AMBER);
+    doc.text(fmtTick(rStep * k, rStep), px + pw + 1.5, yy + 1);
+  }
+  doc.setTextColor(...GRAY);
+  for (let h = 0; h <= 24; h += 3) {
+    const xx = px + (h / 24) * pw;
+    doc.setDrawColor(...LGRAY);
+    doc.line(xx, py + ph, xx, py + ph + 1);
+    doc.text(`${String(h).padStart(2, '0')}:00`, xx, py + ph + 4, { align: 'center' });
+  }
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...BLUE);
+  doc.text('Verbrauch', ML, py - 2.5);
+  doc.setTextColor(...AMBER);
+  doc.text('PV-Produktion', MR, py - 2.5, { align: 'right' });
+
+  // Polylinie bzw. geschlossene Fläche aus absoluten Punkten.
+  const path = (pts, style) => {
+    const d = pts.slice(1).map((pt, i) => [pt[0] - pts[i][0], pt[1] - pts[i][1]]);
+    doc.lines(d, pts[0][0], pts[0][1], [1, 1], style, style === 'F');
+  };
+
+  // Solarstrom des Teilnehmers als Fläche (linke Achse)
+  const solarPts = prof.solar.map((v, i) => [xOf(i), yL(v)]);
+  doc.setFillColor(204, 236, 216);
+  path([[xOf(0), py + ph], ...solarPts, [xOf(n - 1), py + ph]], 'F');
+  doc.setDrawColor(...GREEN);
+  doc.setLineWidth(0.25);
+  path(solarPts, 'S');
+
+  // PV-Produktion (rechte Achse)
+  doc.setDrawColor(...AMBER);
+  doc.setLineWidth(0.4);
+  doc.setLineDashPattern([1.2, 0.8], 0);
+  path(prof.pv.map((v, i) => [xOf(i), yR(v)]), 'S');
+  doc.setLineDashPattern([], 0);
+
+  // Verbrauch (linke Achse)
+  doc.setDrawColor(...BLUE);
+  doc.setLineWidth(0.5);
+  path(prof.cons.map((v, i) => [xOf(i), yL(v)]), 'S');
+
+  // Achsen
+  doc.setDrawColor(...LGRAY);
+  doc.setLineWidth(0.2);
+  doc.line(px, py, px, py + ph);
+  doc.line(px + pw, py, px + pw, py + ph);
+  doc.line(px, py + ph, px + pw, py + ph);
+
+  // Legende
+  let ly = py + ph + 9, lx = ML;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(...BLACK);
+  const legend = (draw, label) => { draw(lx, ly - 1.2); doc.text(label, lx + 6, ly); lx += doc.getTextWidth(label) + 12; };
+  legend((x, y) => { doc.setDrawColor(...BLUE); doc.setLineWidth(0.6); doc.line(x, y, x + 4.5, y); }, 'Ihr Verbrauch (links)');
+  legend((x, y) => { doc.setFillColor(204, 236, 216); doc.rect(x, y - 1.5, 4.5, 3, 'F'); doc.setDrawColor(...GREEN); doc.setLineWidth(0.3); doc.line(x, y - 1.5, x + 4.5, y - 1.5); }, 'davon Solarstrom (links)');
+  legend((x, y) => { doc.setDrawColor(...AMBER); doc.setLineWidth(0.5); doc.setLineDashPattern([1.2, 0.8], 0); doc.line(x, y, x + 4.5, y); doc.setLineDashPattern([], 0); }, 'PV-Produktion vZEV (rechts)');
+
+  return ly;
 }
 
 function drawFooter(doc, ctx, page) {
