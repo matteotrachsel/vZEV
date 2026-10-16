@@ -79,6 +79,7 @@ async function processFile(file) {
     }
     AppState.detectedMPs = [...new Set(AppState.parsedData.map(r => r.messpunkt))].sort();
     AppState.virtualMPs  = detectVirtualMPs(AppState.parsedData);
+    if (typeof applyBkwTariffsForPeriod === 'function') applyBkwTariffsForPeriod(AppState.parsedData);
     const n = AppState.detectedMPs.length;
     const v = AppState.virtualMPs.length;
     st.innerHTML = mkAlert('as',

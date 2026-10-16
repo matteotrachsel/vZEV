@@ -489,6 +489,13 @@ main {
 .tfield input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,70,176,.1); }
 .tfield .suffix { font-size: .72rem; color: var(--text-muted); font-weight: 500; margin-top: .3rem; }
 
+.tariff-source {
+  margin-top: 1rem; padding: .55rem .8rem; border-left: 3px solid var(--border);
+  background: var(--blue-xlight); font-size: .74rem; line-height: 1.55; color: var(--text-mid); font-weight: 500;
+}
+.tariff-source.ok   { border-color: var(--green); background: var(--green-light); color: #1A6B3C; }
+.tariff-source.warn { border-color: var(--amber); background: var(--amber-light); color: #8A4F00; }
+
 .tariff-tag {
   display: inline-flex;
   align-items: center;
