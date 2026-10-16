@@ -40,7 +40,9 @@ function applyBkwTariffs(year, note = '') {
       `<strong>BKW-Tarife ${year} geladen</strong>${stand}. ` +
       `Einheitstarif = (Energie ${p.energyRp.toFixed(2)} + Netz ${p.gridRp.toFixed(2)} Rp.) × ${(1 + p.vat).toFixed(3)} MWSt.; ` +
       `Grundtarif = (${b.energy} + ${b.grid} + Messung ${b.metering}) CHF/Monat × 12 × ${(1 + p.vat).toFixed(3)}` +
-      (p.municipality ? `; Konzession ${p.municipality}.` : '.') +
+      (p.municipality && p.konzessionRp != null
+        ? `; Konzession ${p.municipality} ${p.konzessionRp.toFixed(2)} Rp. × ${(1 + p.vat).toFixed(3)}.` : '.') +
+      ' Die Netznutzung enthält bereits Systemdienstleistungen, Stromreserve und die gesetzliche Förderabgabe.' +
       (note ? `<br>${note}` : ''));
     return true;
   }

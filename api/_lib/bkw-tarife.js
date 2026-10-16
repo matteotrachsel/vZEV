@@ -5,7 +5,11 @@
 // daraus pro Jahr die Werte gebildet, die im Tool eingegeben werden:
 //   Einheitstarif  = (Energie + Netznutzung) × (1 + MWSt.)        Rp./kWh
 //   Grundtarif     = (Grundpreis Energie + Netz + Messung) × 12 × (1 + MWSt.)  CHF/Jahr
-//   Konzession     = Konzessionsabgabe der Gemeinde               Rp./kWh
+//   Konzession     = Konzessionsabgabe der Gemeinde × (1 + MWSt.)  Rp./kWh
+// Der Netztarif der Datei enthält bereits die Bundesabgaben, die BKW auf der
+// Rechnung einzeln ausweist (Netznutzung 8.39 + Systemdienstleistungen 0.27 +
+// Stromreserve 0.41 + solidarisierte Kosten 0.05 + Förderabgabe 2.30 = 11.42
+// Rp./kWh im Jahr 2026). Auch auf die Konzessionsabgabe erhebt BKW MWSt.
 // Unterscheiden sich die Tarife innerhalb eines Jahres (mehrere Einträge),
 // wird der Eintrag genommen, der am 1. Januar gilt.
 
@@ -73,7 +77,7 @@ function extractTariffs(json, opts = {}) {
         // Werte, wie sie im Tool eingesetzt werden (inkl. MWSt.)
         energyAllInRp:  round((energyRp + gridRp) * (1 + o.vat), 2),
         grundtarifChfY: round(baseChfMonth * 12 * (1 + o.vat), 2),
-        konzessionRp:   konz ? round(konz.price * 100, 2) : null,
+        konzessionRp:   konz ? round(konz.price * 100 * (1 + o.vat), 2) : null,
         // Bausteine exkl. MWSt. zur Nachvollziehbarkeit
         parts: {
           energyRp: round(energyRp, 4),
@@ -83,6 +87,7 @@ function extractTariffs(json, opts = {}) {
             grid:     grid.prices.base?.price || 0,
             metering: meter.prices.base?.price || 0
           },
+          konzessionRp: konz ? round(konz.price * 100, 4) : null,
           municipality: konz ? `${konz.name} (${o.municipality})` : null,
           vat: o.vat
         }
