@@ -87,6 +87,12 @@ function calculateAndRender() {
   const distStats = {};
   consMeters.forEach(m => { distStats[m.messpunktNr] = []; });
 
+  // Tagesprofil (96 Viertelstunden): Summen über alle Tage, für die Rechnungsgrafik.
+  const SLOTS   = 96;
+  const zeros   = () => new Array(SLOTS).fill(0);
+  const profile = { n: zeros(), pv: zeros(), meters: {} };
+  consMeters.forEach(m => { profile.meters[m.messpunktNr] = { cons: zeros(), solar: zeros() }; });
+
   // ── Per-interval distribution ─────────────────────────────────────────────
   // Zwei Stufen, wie sie der Netzbetreiber (BKW) abrechnet:
   //  1. Eigenverbrauch – eine PV-Anlage deckt zuerst den Verbrauch am eigenen
@@ -99,6 +105,7 @@ function calculateAndRender() {
   Object.entries(byTS).forEach(([ts, slots]) => {
     const d  = new Date(parseInt(ts, 10));
     const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const slot = d.getHours() * 4 + Math.floor(d.getMinutes() / 15);
 
     const prod   = prodMeters.reduce((s, m) => {
       const sl = slots[m.messpunktNr];
@@ -149,6 +156,8 @@ function calculateAndRender() {
       agg[m.messpunktNr][mk].own  += fromOwn;
       agg[m.messpunktNr][mk].pool += fromPool;
       agg[m.messpunktNr][mk].grid += c - vzev;
+      profile.meters[m.messpunktNr].cons[slot]  += c;
+      profile.meters[m.messpunktNr].solar[slot] += vzev;
       // Zuteilungsstatistik bezieht sich auf den Pool-Anteil (Stufe 2).
       if (poolUse > 0 && openC > 0) distStats[m.messpunktNr].push((rest.get(m.messpunktNr) / openC) * 100);
     });
@@ -159,6 +168,9 @@ function calculateAndRender() {
       if (!agg[pm.messpunktNr][mk]) agg[pm.messpunktNr][mk] = { cons: 0, vzev: 0, own: 0, pool: 0, grid: 0, prod: 0 };
       agg[pm.messpunktNr][mk].prod += pmP;
     });
+
+    profile.n[slot]  += 1;
+    profile.pv[slot] += prod;
 
     if (!monthly[mk]) monthly[mk] = { cons: 0, vzev: 0, own: 0, pool: 0, grid: 0, prod: 0, sc: 0, fi: 0 };
     monthly[mk].cons += totalC;
@@ -189,7 +201,14 @@ function calculateAndRender() {
 
   // Persist result so invoice generator can access it without recalculating.
   const fixed = allocateFixedCosts(agg, meters, tariff, periodStart, periodEnd);
-  AppState.lastResult = { agg, monthly, tot, scRate, ssRate, meters, tariff, distStats, periodStart, periodEnd, fixed };
+  // Summen → Durchschnitt pro Viertelstunde (kWh je 15 min).
+  const avg = arr => arr.map((v, i) => profile.n[i] ? v / profile.n[i] : 0);
+  const dayProfile = { pv: avg(profile.pv), meters: {} };
+  Object.entries(profile.meters).forEach(([mp, p]) => {
+    dayProfile.meters[mp] = { cons: avg(p.cons), solar: avg(p.solar) };
+  });
+
+  AppState.lastResult = { agg, monthly, tot, scRate, ssRate, meters, tariff, distStats, periodStart, periodEnd, fixed, dayProfile };
 
   // ── Render all sections ───────────────────────────────────────────────────
   renderSummary(tot, scRate, ssRate);
